@@ -29,3 +29,9 @@ Thumbs.db
 # Go workspace
 go.work
 go.work.sum
+
+# Local-only planning files
+todo.md
+promt.md
+memory.md
+MEMORY.md
