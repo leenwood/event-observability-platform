@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -15,19 +14,18 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/http/middleware"
+	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"github.com/leenwood/event-observability-platform/internal/storage/postgres"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error("failed to load config", slog.String("error", err.Error()))
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
 	}
+
+	log := logger.New(cfg.Log.Level, cfg.Log.Format)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -40,12 +38,12 @@ func main() {
 		cfg.Postgres.ConnMaxLifetime,
 	)
 	if err != nil {
-		logger.Error("failed to connect to postgres", slog.String("error", err.Error()))
+		log.Error("failed to connect to postgres", "error", err)
 		os.Exit(1)
 	}
 	defer db.Close()
 
-	logger.Info("connected to postgres")
+	log.Info("connected to postgres")
 
 	mux := http.NewServeMux()
 
@@ -59,13 +57,14 @@ func main() {
 		mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
-		logger.Info("pprof endpoints enabled at /debug/pprof/")
+		log.Info("pprof enabled", "path", "/debug/pprof/")
 	}
 
 	chain := middleware.Chain(
 		mux,
-		middleware.Recover(logger),
-		middleware.Logger(logger),
+		middleware.Recover(log),
+		middleware.Logger(log),
+		middleware.RequestID,
 	)
 
 	addr := fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port)
@@ -78,9 +77,9 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("server starting", slog.String("addr", addr))
+		log.Info("server starting", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server error", slog.String("error", err.Error()))
+			log.Error("server error", "error", err)
 			os.Exit(1)
 		}
 	}()
@@ -89,14 +88,14 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("shutting down server")
+	log.Info("shutting down")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("server shutdown error", slog.String("error", err.Error()))
+		log.Error("shutdown error", "error", err)
 	}
 
-	logger.Info("server stopped")
+	log.Info("server stopped")
 }
