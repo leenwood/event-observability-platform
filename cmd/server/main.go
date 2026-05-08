@@ -14,8 +14,12 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/http/middleware"
+	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
+	"github.com/leenwood/event-observability-platform/internal/observability/tracing"
 	"github.com/leenwood/event-observability-platform/internal/storage/postgres"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -27,11 +31,28 @@ func main() {
 
 	log := logger.New(cfg.Log.Level, cfg.Log.Format)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	initCtx, initCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer initCancel()
+
+	shutdownTracing, err := tracing.Init(initCtx, tracing.Config{
+		Enabled:      cfg.OTel.Enabled,
+		ServiceName:  cfg.OTel.ServiceName,
+		ExporterType: cfg.OTel.ExporterType,
+		Endpoint:     cfg.OTel.Endpoint,
+	})
+	if err != nil {
+		log.Error("failed to init tracing", "error", err)
+		os.Exit(1)
+	}
+
+	if cfg.OTel.Enabled {
+		log.Info("opentelemetry tracing enabled", "exporter", cfg.OTel.ExporterType)
+	}
+
+	m := metrics.New()
 
 	db, err := postgres.New(
-		ctx,
+		initCtx,
 		cfg.Postgres.DSN,
 		cfg.Postgres.MaxOpenConns,
 		cfg.Postgres.MaxIdleConns,
@@ -51,6 +72,10 @@ func main() {
 	mux.HandleFunc("GET /health", healthHandler.Health)
 	mux.HandleFunc("GET /ready", healthHandler.Ready)
 
+	mux.Handle("GET /metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
+		EnableOpenMetrics: true,
+	}))
+
 	if cfg.HTTP.PprofEnabled {
 		mux.HandleFunc("GET /debug/pprof/", pprof.Index)
 		mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
@@ -60,11 +85,15 @@ func main() {
 		log.Info("pprof enabled", "path", "/debug/pprof/")
 	}
 
-	chain := middleware.Chain(
-		mux,
-		middleware.Recover(log),
-		middleware.Logger(log),
-		middleware.RequestID,
+	chain := otelhttp.NewHandler(
+		middleware.Chain(
+			mux,
+			middleware.Recover(log),
+			middleware.Logger(log, m),
+			middleware.RequestID,
+		),
+		"http.server",
+		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
 	)
 
 	addr := fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port)
@@ -95,6 +124,10 @@ func main() {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error("shutdown error", "error", err)
+	}
+
+	if err := shutdownTracing(shutdownCtx); err != nil {
+		log.Error("tracing shutdown error", "error", err)
 	}
 
 	log.Info("server stopped")
