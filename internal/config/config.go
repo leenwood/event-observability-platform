@@ -4,15 +4,25 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
 	HTTP     HTTPConfig
 	Postgres PostgresConfig
+	Kafka    KafkaConfig
 	Log      LogConfig
 	OTel     OTelConfig
 	App      AppConfig
+}
+
+type KafkaConfig struct {
+	Brokers       []string
+	TopicEvents   string
+	TopicDLQ      string
+	ConsumerGroup string
+	MaxRetries    int
 }
 
 type AppConfig struct {
@@ -67,6 +77,13 @@ func Load() (*Config, error) {
 			Level:  getEnv("LOG_LEVEL", "info"),
 			Format: getEnv("LOG_FORMAT", "json"),
 		},
+		Kafka: KafkaConfig{
+			Brokers:       getEnvStringSlice("KAFKA_BROKERS", []string{"localhost:19092"}),
+			TopicEvents:   getEnv("KAFKA_TOPIC_EVENTS", "events"),
+			TopicDLQ:      getEnv("KAFKA_TOPIC_DLQ", "events.dlq"),
+			ConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "event-processor"),
+			MaxRetries:    getEnvInt("KAFKA_MAX_RETRIES", 3),
+		},
 		OTel: OTelConfig{
 			Enabled:      getEnvBool("OTEL_ENABLED", false),
 			ServiceName:  getEnv("OTEL_SERVICE_NAME", "event-observability-platform"),
@@ -117,6 +134,21 @@ func getEnvBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return b
+}
+
+func getEnvStringSlice(key string, fallback []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parts := strings.Split(v, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 func getEnvDuration(key string, fallback time.Duration) time.Duration {

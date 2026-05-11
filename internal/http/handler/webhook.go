@@ -13,6 +13,7 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/idempotency"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
+	"github.com/leenwood/event-observability-platform/internal/worker"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -22,21 +23,33 @@ import (
 var webhookTracer = otel.Tracer("handler/webhook")
 
 type WebhookHandler struct {
-	events  app.EventRepository
-	idem    idempotency.Store
-	metrics *metrics.Metrics
-	log     *slog.Logger
-	idemTTL time.Duration
+	events      app.EventRepository
+	idem        idempotency.Store
+	publisher   app.Publisher
+	eventsTopic string
+	metrics     *metrics.Metrics
+	log         *slog.Logger
+	idemTTL     time.Duration
 }
 
 func NewWebhookHandler(
 	events app.EventRepository,
 	idem idempotency.Store,
+	publisher app.Publisher,
+	eventsTopic string,
 	m *metrics.Metrics,
 	log *slog.Logger,
 	idemTTL time.Duration,
 ) *WebhookHandler {
-	return &WebhookHandler{events: events, idem: idem, metrics: m, log: log, idemTTL: idemTTL}
+	return &WebhookHandler{
+		events:      events,
+		idem:        idem,
+		publisher:   publisher,
+		eventsTopic: eventsTopic,
+		metrics:     m,
+		log:         log,
+		idemTTL:     idemTTL,
+	}
 }
 
 type webhookRequest struct {
@@ -171,6 +184,22 @@ func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {
 		slog.String("source", event.Source),
 		slog.String("event_type", event.EventType),
 	)
+
+	// Publish to queue asynchronously. A failure here does not roll back the
+	// DB insert — the event remains 'pending' and can be reconciled later.
+	// See README: "Possible production improvements → transactional outbox".
+	if h.publisher != nil {
+		msg := worker.EventMessage{EventID: event.ID, Attempt: 1}
+		value, err := worker.MarshalEventMessage(msg)
+		if err == nil {
+			if err := h.publisher.Publish(ctx, h.eventsTopic, event.ID, value); err != nil {
+				log.WarnContext(ctx, "failed to publish event to queue",
+					slog.String("error", err.Error()),
+					slog.String("event_id", event.ID),
+				)
+			}
+		}
+	}
 
 	writeJSON(w, http.StatusAccepted, resp)
 }
