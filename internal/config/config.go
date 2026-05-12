@@ -9,12 +9,20 @@ import (
 )
 
 type Config struct {
-	HTTP     HTTPConfig
-	Postgres PostgresConfig
-	Kafka    KafkaConfig
-	Log      LogConfig
-	OTel     OTelConfig
-	App      AppConfig
+	HTTP       HTTPConfig
+	Postgres   PostgresConfig
+	Kafka      KafkaConfig
+	ClickHouse ClickHouseConfig
+	Log        LogConfig
+	OTel       OTelConfig
+	App        AppConfig
+}
+
+type ClickHouseConfig struct {
+	Addr     string
+	Database string
+	Username string
+	Password string
 }
 
 type KafkaConfig struct {
@@ -76,6 +84,12 @@ func Load() (*Config, error) {
 		Log: LogConfig{
 			Level:  getEnv("LOG_LEVEL", "info"),
 			Format: getEnv("LOG_FORMAT", "json"),
+		},
+		ClickHouse: ClickHouseConfig{
+			Addr:     getEnv("CLICKHOUSE_ADDR", "localhost:9000"),
+			Database: getEnv("CLICKHOUSE_DATABASE", "events"),
+			Username: getEnv("CLICKHOUSE_USER", "events"),
+			Password: getEnv("CLICKHOUSE_PASSWORD", "events"),
 		},
 		Kafka: KafkaConfig{
 			Brokers:       getEnvStringSlice("KAFKA_BROKERS", []string{"localhost:19092"}),
