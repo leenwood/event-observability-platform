@@ -15,6 +15,8 @@ type Metrics struct {
 
 	QueueLagMessages *prometheus.GaugeVec
 
+	OutboundRequestsTotal *prometheus.CounterVec
+
 	Registry *prometheus.Registry
 }
 
@@ -64,6 +66,13 @@ func New() *Metrics {
 			Help:      "Total duplicate webhook events absorbed by idempotency check.",
 		}),
 
+		OutboundRequestsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "platform",
+			Subsystem: "http",
+			Name:      "outbound_requests_total",
+			Help:      "Total outbound HTTP requests made to external services.",
+		}, []string{"target", "method", "status"}),
+
 		QueueLagMessages: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "platform",
 			Subsystem: "queue",
@@ -79,6 +88,7 @@ func New() *Metrics {
 		m.EventsFailedTotal,
 		m.EventsDuplicateTotal,
 		m.QueueLagMessages,
+		m.OutboundRequestsTotal,
 	)
 
 	return m
