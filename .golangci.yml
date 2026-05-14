@@ -1,0 +1,61 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - unparam
+    - dogsled
+    - dupl
+    - exhaustive
+    - godot
+    - nilerr
+    - noctx
+    - bodyclose
+    - contextcheck
+    - revive
+    - gosec
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: var-naming
+        disabled: false
+      - name: indent-error-flow
+        disabled: false
+  gosec:
+    excludes:
+      - G115   # integer overflow conversion — too noisy in config parsing
+  dupl:
+    threshold: 150
+  exhaustive:
+    default-signifies-exhaustive: true
+  godot:
+    scope: toplevel
+    capital: false
+  goimports:
+    local-prefixes: github.com/leenwood/event-observability-platform
+
+issues:
+  exclude-rules:
+    # Test helpers frequently shadow outer names — not a real issue in tests.
+    - path: "_test\\.go"
+      linters:
+        - dupl
+        - gosec
+    # Main entrypoints call log.Fatal; that's intentional.
+    - path: "cmd/"
+      linters:
+        - revive
+  max-issues-per-linter: 50
+  max-same-issues: 5
