@@ -1,0 +1,153 @@
+version: "3"
+
+vars:
+  BINARY_SERVER: bin/server
+  BINARY_WORKER: bin/worker
+  MODULE: github.com/leenwood/event-observability-platform
+  GOFLAGS: -trimpath
+
+tasks:
+
+  default:
+    desc: List all available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  # ── Build ──────────────────────────────────────────────────────────────────
+
+  build:
+    desc: Build server and worker binaries
+    deps: [build:server, build:worker]
+
+  build:server:
+    desc: Build server binary → bin/server
+    cmds:
+      - go build {{.GOFLAGS}} -o {{.BINARY_SERVER}} ./cmd/server
+
+  build:worker:
+    desc: Build worker binary → bin/worker
+    cmds:
+      - go build {{.GOFLAGS}} -o {{.BINARY_WORKER}} ./cmd/worker
+
+  # ── Run ───────────────────────────────────────────────────────────────────
+
+  run:
+    desc: Run HTTP server locally (reads .env)
+    cmds:
+      - go run ./cmd/server
+
+  run:worker:
+    desc: Run async event worker locally (reads .env)
+    cmds:
+      - go run ./cmd/worker
+
+  # ── Test ──────────────────────────────────────────────────────────────────
+
+  test:
+    desc: Run unit tests with race detector
+    cmds:
+      - go test -race -count=1 -timeout=60s ./...
+
+  test:integration:
+    desc: Run integration tests against real containers (requires Docker)
+    cmds:
+      - go test -race -count=1 -timeout=120s -tags=integration ./...
+
+  test:cover:
+    desc: Run tests and produce HTML coverage report (coverage.html)
+    cmds:
+      - go test -race -count=1 -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report written to coverage.html"
+
+  # ── Code quality ──────────────────────────────────────────────────────────
+
+  lint:
+    desc: Run golangci-lint against all packages
+    cmds:
+      - golangci-lint run ./...
+
+  fmt:
+    desc: Format all Go source files with gofmt and goimports
+    cmds:
+      - go fmt ./...
+      - goimports -w .
+
+  vet:
+    desc: Run go vet against all packages
+    cmds:
+      - go vet ./...
+
+  # ── Docker ────────────────────────────────────────────────────────────────
+
+  docker:up:
+    desc: Start infrastructure containers (postgres, clickhouse, redpanda, prometheus, grafana)
+    cmds:
+      - docker compose up -d postgres clickhouse redpanda redpanda-init prometheus grafana
+
+  docker:down:
+    desc: Stop all containers
+    cmds:
+      - docker compose down
+
+  docker:reset:
+    desc: Stop containers and wipe all volumes (destructive)
+    cmds:
+      - docker compose down -v
+
+  docker:logs:
+    desc: Stream logs from all running containers
+    cmds:
+      - docker compose logs -f
+
+  # ── Migrations ────────────────────────────────────────────────────────────
+
+  migrate:up:
+    desc: Apply all pending PostgreSQL and ClickHouse migrations
+    cmds:
+      - |
+        echo "Running PostgreSQL migrations..."
+        for f in migrations/postgres/*.up.sql; do
+          echo "  -> $f"
+          PGPASSWORD=events psql -h localhost -U events -d events -f "$f"
+        done
+      - |
+        echo "Running ClickHouse migrations..."
+        for f in migrations/clickhouse/*.up.sql; do
+          echo "  -> $f"
+          curl -s "http://localhost:8123/?user=events&password=events" --data-binary @"$f"
+        done
+      - echo "Migrations done."
+
+  migrate:down:
+    desc: Revert all PostgreSQL migrations in reverse order
+    cmds:
+      - |
+        echo "Reverting PostgreSQL migrations..."
+        for f in $(ls -r migrations/postgres/*.down.sql); do
+          echo "  -> $f"
+          PGPASSWORD=events psql -h localhost -U events -d events -f "$f"
+        done
+
+  migrate:create:
+    desc: "Create a new migration file pair. Usage: task migrate:create -- <name>"
+    cmds:
+      - |
+        name="{{.CLI_ARGS}}"
+        if [ -z "$name" ]; then
+          echo "Error: migration name required. Usage: task migrate:create -- <name>" >&2
+          exit 1
+        fi
+        count=$(ls migrations/postgres/*.up.sql 2>/dev/null | wc -l | tr -d ' ')
+        ts=$(printf '%03d' $((count + 1)))
+        touch "migrations/postgres/${ts}_${name}.up.sql" "migrations/postgres/${ts}_${name}.down.sql"
+        echo "Created migrations/postgres/${ts}_${name}.{up,down}.sql"
+
+  # ── Dependencies ──────────────────────────────────────────────────────────
+
+  deps:
+    desc: Download and tidy Go module dependencies
+    cmds:
+      - go mod download
+      - go mod tidy

@@ -139,9 +139,12 @@ exactly-once would require a transactional outbox pattern.
 
 ## Local Setup
 
-**Prerequisites:** Docker, Docker Compose, Go 1.22+, `make`
+**Prerequisites:** Docker, Docker Compose, Go 1.22+, [go-task](https://taskfile.dev/installation/)
 
 ```bash
+# Install go-task (once)
+go install github.com/go-task/task/v3/cmd/task@latest
+
 # 1. Clone and enter
 git clone https://github.com/leenwood/event-observability-platform
 cd event-observability-platform
@@ -150,13 +153,13 @@ cd event-observability-platform
 cp .env.example .env
 
 # 3. Start infrastructure
-make docker-up
+task docker:up
 
 # 4. Run migrations
-make migrate-up
+task migrate:up
 
 # 5. Run the server
-make run
+task run
 ```
 
 Services available locally:
@@ -208,22 +211,31 @@ curl http://localhost:8080/metrics
 
 ---
 
-## Useful Makefile Commands
+## Useful Task Commands
+
+Run `task --list` to see all available commands.
 
 | Command | Description |
 |---|---|
-| `make build` | Build server and worker binaries |
-| `make run` | Run HTTP server locally |
-| `make run-worker` | Run async event worker |
-| `make test` | Run unit tests |
-| `make test-integration` | Run integration tests (requires Docker) |
-| `make test-cover` | Tests with HTML coverage report |
-| `make lint` | Run golangci-lint |
-| `make docker-up` | Start all infrastructure containers |
-| `make docker-down` | Stop containers |
-| `make docker-reset` | Stop containers and wipe volumes |
-| `make migrate-up` | Apply all migrations |
-| `make migrate-down` | Revert all migrations |
+| `task build` | Build server and worker binaries |
+| `task build:server` | Build server binary only |
+| `task build:worker` | Build worker binary only |
+| `task run` | Run HTTP server locally |
+| `task run:worker` | Run async event worker |
+| `task test` | Run unit tests with race detector |
+| `task test:integration` | Run integration tests (requires Docker) |
+| `task test:cover` | Tests with HTML coverage report |
+| `task lint` | Run golangci-lint |
+| `task vet` | Run go vet |
+| `task fmt` | Format code with gofmt + goimports |
+| `task docker:up` | Start all infrastructure containers |
+| `task docker:down` | Stop containers |
+| `task docker:reset` | Stop containers and wipe volumes |
+| `task docker:logs` | Stream container logs |
+| `task migrate:up` | Apply all migrations |
+| `task migrate:down` | Revert all migrations |
+| `task migrate:create -- <name>` | Create new migration file pair |
+| `task deps` | Download and tidy Go dependencies |
 
 ---
 
