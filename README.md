@@ -1,5 +1,7 @@
 # Event Observability Platform
 
+[🇷🇺 Русский](README.ru.md)
+
 A production-oriented Go backend service for webhook ingestion, asynchronous event processing,
 and analytics. Built to demonstrate real-world patterns in observability, distributed systems,
 and data pipelines.
@@ -248,8 +250,8 @@ Integration tests use `testcontainers-go` to spin up real PostgreSQL and ClickHo
 verifying the full webhook → DB → Kafka → worker → ClickHouse flow.
 
 ```bash
-make test
-make test-integration
+task test
+task test:integration
 ```
 
 ---
