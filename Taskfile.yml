@@ -144,6 +144,13 @@ tasks:
         touch "migrations/postgres/${ts}_${name}.up.sql" "migrations/postgres/${ts}_${name}.down.sql"
         echo "Created migrations/postgres/${ts}_${name}.{up,down}.sql"
 
+  # ── Documentation ─────────────────────────────────────────────────────────
+
+  docs:
+    desc: "Regenerate Swagger docs (requires: go install github.com/swaggo/swag/cmd/swag@latest)"
+    cmds:
+      - swag init -g cmd/server/main.go -o docs/swagger --parseDependency --parseInternal
+
   # ── Dependencies ──────────────────────────────────────────────────────────
 
   deps:

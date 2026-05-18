@@ -163,6 +163,7 @@ task run
 | Сервис | URL |
 |---|---|
 | API-сервер | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger/index.html |
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 (admin/admin) |
 | Redpanda Console | http://localhost:18082 |
@@ -232,6 +233,7 @@ curl http://localhost:8080/metrics
 | `task migrate:up` | Применить все миграции |
 | `task migrate:down` | Откатить все миграции |
 | `task migrate:create -- <name>` | Создать пару файлов новой миграции |
+| `task docs` | Перегенерировать Swagger-документацию из аннотаций |
 | `task deps` | Скачать и привести в порядок зависимости |
 
 ---

@@ -25,6 +25,17 @@ func NewAnalyticsHandler(querier analyticsQuerier, log *slog.Logger) *AnalyticsH
 	return &AnalyticsHandler{querier: querier, log: log}
 }
 
+// DailyEvents returns aggregated event counts grouped by day, source, and event type.
+//
+// @Summary  Daily event statistics
+// @Tags     analytics
+// @Produce  json
+// @Param    from  query     string                   true  "Start date (YYYY-MM-DD)"
+// @Param    to    query     string                   true  "End date (YYYY-MM-DD, max 366 days range)"
+// @Success  200   {array}   analytics.DailyEventStat
+// @Failure  400   {object}  errorResponse
+// @Failure  500   {object}  errorResponse
+// @Router   /analytics/daily-events [get]
 func (h *AnalyticsHandler) DailyEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.FromContext(ctx, h.log)

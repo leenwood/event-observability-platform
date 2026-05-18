@@ -168,6 +168,7 @@ Services available locally:
 | Service | URL |
 |---|---|
 | API server | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger/index.html |
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 (admin/admin) |
 | Redpanda Console | http://localhost:18082 |
@@ -237,6 +238,7 @@ Run `task --list` to see all available commands.
 | `task migrate:up` | Apply all migrations |
 | `task migrate:down` | Revert all migrations |
 | `task migrate:create -- <name>` | Create new migration file pair |
+| `task docs` | Regenerate Swagger docs from annotations |
 | `task deps` | Download and tidy Go dependencies |
 
 ---

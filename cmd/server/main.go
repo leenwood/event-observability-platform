@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/leenwood/event-observability-platform/docs/swagger"
 	"github.com/leenwood/event-observability-platform/internal/analytics"
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/http/handler"
@@ -23,8 +24,29 @@ import (
 	chstorage "github.com/leenwood/event-observability-platform/internal/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/storage/postgres"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
+
+// @title       Event Observability Platform API
+// @version     1.0
+// @description Production-oriented webhook ingestion, async event processing, and analytics service.
+// @description
+// @description Demonstrates OpenTelemetry tracing, Prometheus metrics, Kafka pipelines,
+// @description ClickHouse analytics, idempotent processing, and circuit breaker patterns.
+//
+// @contact.name  leenwood
+// @contact.url   https://github.com/leenwood/event-observability-platform
+//
+// @host      localhost:8080
+// @BasePath  /
+//
+// @tag.name         webhooks
+// @tag.description  Webhook ingestion endpoint
+// @tag.name         analytics
+// @tag.description  ClickHouse-backed analytical queries
+// @tag.name         health
+// @tag.description  Liveness and readiness probes
 
 const maxBodyBytes = 1 << 20 // 1 MiB
 
@@ -112,6 +134,8 @@ func main() {
 	mux.Handle("GET /metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
 		EnableOpenMetrics: true,
 	}))
+
+	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	if cfg.HTTP.PprofEnabled {
 		mux.HandleFunc("GET /debug/pprof/", pprof.Index)

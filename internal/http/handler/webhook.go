@@ -84,6 +84,23 @@ type webhookResponse struct {
 	TraceID string `json:"trace_id,omitempty"`
 }
 
+// HandleEvent ingests a webhook event.
+//
+// @Summary  Ingest webhook event
+// @Description Validates and deduplicates the request, persists the event to PostgreSQL,
+// @Description then publishes it to the Kafka processing queue.
+// @Description Duplicate requests (same idempotency_key within TTL) return the original response.
+// @Tags     webhooks
+// @Accept   json
+// @Produce  json
+// @Param    request  body      webhookRequest   true  "Webhook event payload"
+// @Success  202      {object}  webhookResponse  "Event accepted for processing"
+// @Success  200      {object}  webhookResponse  "Duplicate — replayed from idempotency store (X-Idempotent-Replayed: true)"
+// @Failure  400      {object}  errorResponse    "Invalid JSON"
+// @Failure  415      {object}  errorResponse    "Unsupported Content-Type"
+// @Failure  422      {object}  errorResponse    "Missing required fields"
+// @Failure  500      {object}  errorResponse    "Internal server error"
+// @Router   /webhooks/events [post]
 func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, span := webhookTracer.Start(r.Context(), "WebhookHandler.HandleEvent")
 	defer span.End()

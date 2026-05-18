@@ -1,0 +1,174 @@
+basePath: /
+definitions:
+  github_com_leenwood_event-observability-platform_internal_analytics.DailyEventStat:
+    properties:
+      date:
+        type: string
+      event_count:
+        type: integer
+      event_type:
+        type: string
+      source:
+        type: string
+    type: object
+  internal_http_handler.errorResponse:
+    properties:
+      code:
+        type: string
+      error:
+        type: string
+    type: object
+  internal_http_handler.webhookRequest:
+    properties:
+      event_type:
+        type: string
+      idempotency_key:
+        type: string
+      payload:
+        items:
+          type: integer
+        type: array
+      source:
+        type: string
+    type: object
+  internal_http_handler.webhookResponse:
+    properties:
+      event_id:
+        type: string
+      trace_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: leenwood
+    url: https://github.com/leenwood/event-observability-platform
+  description: |-
+    Production-oriented webhook ingestion, async event processing, and analytics service.
+
+    Demonstrates OpenTelemetry tracing, Prometheus metrics, Kafka pipelines,
+    ClickHouse analytics, idempotent processing, and circuit breaker patterns.
+  title: Event Observability Platform API
+  version: "1.0"
+paths:
+  /analytics/daily-events:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD, max 366 days range)
+        in: query
+        name: to
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_leenwood_event-observability-platform_internal_analytics.DailyEventStat'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handler.errorResponse'
+      summary: Daily event statistics
+      tags:
+      - analytics
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness probe
+      tags:
+      - health
+  /ready:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ready
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: database unreachable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Readiness probe
+      tags:
+      - health
+  /webhooks/events:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Validates and deduplicates the request, persists the event to PostgreSQL,
+        then publishes it to the Kafka processing queue.
+        Duplicate requests (same idempotency_key within TTL) return the original response.
+      parameters:
+      - description: Webhook event payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.webhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Duplicate — replayed from idempotency store (X-Idempotent-Replayed:
+            true)'
+          schema:
+            $ref: '#/definitions/internal_http_handler.webhookResponse'
+        "202":
+          description: Event accepted for processing
+          schema:
+            $ref: '#/definitions/internal_http_handler.webhookResponse'
+        "400":
+          description: Invalid JSON
+          schema:
+            $ref: '#/definitions/internal_http_handler.errorResponse'
+        "415":
+          description: Unsupported Content-Type
+          schema:
+            $ref: '#/definitions/internal_http_handler.errorResponse'
+        "422":
+          description: Missing required fields
+          schema:
+            $ref: '#/definitions/internal_http_handler.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_http_handler.errorResponse'
+      summary: Ingest webhook event
+      tags:
+      - webhooks
+swagger: "2.0"
+tags:
+- description: Webhook ingestion endpoint
+  name: webhooks
+- description: ClickHouse-backed analytical queries
+  name: analytics
+- description: Liveness and readiness probes
+  name: health
