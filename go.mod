@@ -1,6 +1,6 @@
 module github.com/leenwood/event-observability-platform
 
-go 1.25.9
+go 1.26.1
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.46.0
@@ -8,6 +8,11 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/segmentio/kafka-go v0.4.51
+	github.com/swaggo/http-swagger v1.3.4
+	github.com/swaggo/swag v1.16.4
+	github.com/testcontainers/testcontainers-go v0.42.0
+	github.com/testcontainers/testcontainers-go/modules/clickhouse v0.42.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
@@ -81,11 +86,6 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
-	github.com/swaggo/http-swagger v1.3.4 // indirect
-	github.com/swaggo/swag v1.16.4 // indirect
-	github.com/testcontainers/testcontainers-go v0.42.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/clickhouse v0.42.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
