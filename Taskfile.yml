@@ -66,7 +66,7 @@ tasks:
   lint:
     desc: Run golangci-lint against all packages
     cmds:
-      - golangci-lint run ./...
+      - go tool golangci-lint run ./...
 
   fmt:
     desc: Format all Go source files with gofmt and goimports
