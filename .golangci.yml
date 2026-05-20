@@ -1,9 +1,6 @@
-version: "2"
-
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
@@ -35,7 +32,7 @@ linters-settings:
         disabled: false
   gosec:
     excludes:
-      - G115   # integer overflow conversion — too noisy in config parsing
+      - G115
   dupl:
     threshold: 150
   exhaustive:
@@ -48,12 +45,10 @@ linters-settings:
 
 issues:
   exclude-rules:
-    # Test helpers frequently shadow outer names — not a real issue in tests.
     - path: "_test\\.go"
       linters:
         - dupl
         - gosec
-    # Main entrypoints call log.Fatal; that's intentional.
     - path: "cmd/"
       linters:
         - revive
