@@ -18,8 +18,8 @@ func New(ctx context.Context, dsn string, maxOpen, maxIdle int, maxLifetime time
 		return nil, fmt.Errorf("parse postgres dsn: %w", err)
 	}
 
-	cfg.MaxConns = int32(maxOpen)
-	cfg.MinConns = int32(maxIdle)
+	cfg.MaxConns = int32(maxOpen) //nolint:gosec
+	cfg.MinConns = int32(maxIdle) //nolint:gosec
 	cfg.MaxConnLifetime = maxLifetime
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)

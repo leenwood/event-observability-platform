@@ -32,7 +32,7 @@ func newAnalyticsHandler(q analyticsQuerier) *AnalyticsHandler {
 
 func getAnalytics(t *testing.T, h *AnalyticsHandler, query string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/analytics/daily-events?"+query, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/analytics/daily-events?"+query, nil)
 	rr := httptest.NewRecorder()
 	h.DailyEvents(rr, req)
 	return rr

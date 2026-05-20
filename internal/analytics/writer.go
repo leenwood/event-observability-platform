@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
-	"github.com/leenwood/event-observability-platform/internal/app"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+
+	"github.com/leenwood/event-observability-platform/internal/app"
 )
 
 var writerTracer = otel.Tracer("analytics/writer")

@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/leenwood/event-observability-platform/internal/app"
 	"github.com/leenwood/event-observability-platform/internal/idempotency"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"github.com/leenwood/event-observability-platform/internal/worker"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var webhookTracer = otel.Tracer("handler/webhook")
@@ -101,6 +102,7 @@ type webhookResponse struct {
 // @Failure  422      {object}  errorResponse    "Missing required fields"
 // @Failure  500      {object}  errorResponse    "Internal server error"
 // @Router   /webhooks/events [post]
+// Requires Content-Type: application/json.
 func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, span := webhookTracer.Start(r.Context(), "WebhookHandler.HandleEvent")
 	defer span.End()

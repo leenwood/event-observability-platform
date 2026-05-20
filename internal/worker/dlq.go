@@ -5,12 +5,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/app"
-	"github.com/leenwood/event-observability-platform/internal/integrations/kafka"
-	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/leenwood/event-observability-platform/internal/app"
+	"github.com/leenwood/event-observability-platform/internal/integrations/kafka"
+	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 )
 
 var dlqTracer = otel.Tracer("worker/dlq")
@@ -36,7 +37,7 @@ func (h *DLQHandler) Run(ctx context.Context) error {
 		msg, err := h.consumer.FetchMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil
+				return ctx.Err()
 			}
 			h.log.Error("dlq fetch failed", slog.String("error", err.Error()))
 			time.Sleep(time.Second)
@@ -86,7 +87,7 @@ func (h *DLQHandler) Run(ctx context.Context) error {
 
 		if err := h.consumer.CommitMessages(ctx, msg); err != nil {
 			if ctx.Err() != nil {
-				return nil
+				return ctx.Err()
 			}
 			h.log.Error("dlq commit failed", slog.String("error", err.Error()))
 		}

@@ -48,7 +48,7 @@ func newTestHandler(repo app.EventRepository, store idempotency.Store) *WebhookH
 func postJSON(t *testing.T, h *WebhookHandler, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	b, _ := json.Marshal(body)
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/events", bytes.NewReader(b))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhooks/events", bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.HandleEvent(rr, req)
@@ -134,7 +134,7 @@ func TestWebhookHandler_MissingFields(t *testing.T) {
 func TestWebhookHandler_InvalidJSON(t *testing.T) {
 	h := newTestHandler(&mockEventRepo{}, idempotency.NewMemoryStore())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/events", bytes.NewBufferString("{bad json"))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhooks/events", bytes.NewBufferString("{bad json"))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.HandleEvent(rr, req)
@@ -147,7 +147,7 @@ func TestWebhookHandler_InvalidJSON(t *testing.T) {
 func TestWebhookHandler_WrongContentType(t *testing.T) {
 	h := newTestHandler(&mockEventRepo{}, idempotency.NewMemoryStore())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/events", bytes.NewBufferString("{}"))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhooks/events", bytes.NewBufferString("{}"))
 	req.Header.Set("Content-Type", "text/plain")
 	rr := httptest.NewRecorder()
 	h.HandleEvent(rr, req)

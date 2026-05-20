@@ -11,6 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	_ "github.com/leenwood/event-observability-platform/docs/swagger"
 	"github.com/leenwood/event-observability-platform/internal/analytics"
 	"github.com/leenwood/event-observability-platform/internal/config"
@@ -23,9 +27,6 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/observability/tracing"
 	chstorage "github.com/leenwood/event-observability-platform/internal/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/storage/postgres"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	httpSwagger "github.com/swaggo/http-swagger"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // @title       Event Observability Platform API
@@ -46,7 +47,7 @@ import (
 // @tag.name         analytics
 // @tag.description  ClickHouse-backed analytical queries
 // @tag.name         health
-// @tag.description  Liveness and readiness probes
+// @tag.description  Liveness and readiness probes.
 
 const maxBodyBytes = 1 << 20 // 1 MiB
 
@@ -98,7 +99,11 @@ func main() {
 	idemStore := idempotency.NewPostgresStore(db.Pool)
 
 	producer := kafkaclient.NewProducer(cfg.Kafka.Brokers)
-	defer producer.Close()
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.Error("producer close", "error", err)
+		}
+	}()
 
 	chDB, err := chstorage.New(initCtx, chstorage.Config{
 		Addr:     cfg.ClickHouse.Addr,
@@ -110,7 +115,11 @@ func main() {
 		log.Error("failed to connect to clickhouse", "error", err)
 		os.Exit(1)
 	}
-	defer chDB.Close()
+	defer func() {
+		if err := chDB.Close(); err != nil {
+			log.Error("clickhouse close", "error", err)
+		}
+	}()
 
 	log.Info("connected to clickhouse")
 

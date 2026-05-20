@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
@@ -5,8 +7,6 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - unparam
@@ -20,37 +20,38 @@ linters:
     - contextcheck
     - revive
     - gosec
-
-linters-settings:
-  revive:
+  settings:
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: indent-error-flow
+        - name: var-naming
+        - name: error-return
+    dupl:
+      threshold: 150
+    exhaustive:
+      default-signifies-exhaustive: true
+    godot:
+      scope: toplevel
+      capital: false
+  exclusions:
+    paths:
+      - "docs/swagger"
     rules:
-      - name: exported
-        disabled: false
-      - name: var-naming
-        disabled: false
-      - name: indent-error-flow
-        disabled: false
-  gosec:
-    excludes:
-      - G115
-  dupl:
-    threshold: 150
-  exhaustive:
-    default-signifies-exhaustive: true
-  godot:
-    scope: toplevel
-    capital: false
-  goimports:
-    local-prefixes: github.com/leenwood/event-observability-platform
+      - linters: [dupl, gosec]
+        path: "_test\\.go"
+      - linters: [revive]
+        path: "cmd/"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/leenwood/event-observability-platform
 
 issues:
-  exclude-rules:
-    - path: "_test\\.go"
-      linters:
-        - dupl
-        - gosec
-    - path: "cmd/"
-      linters:
-        - revive
   max-issues-per-linter: 50
   max-same-issues: 5

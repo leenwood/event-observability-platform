@@ -10,12 +10,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/leenwood/event-observability-platform/internal/metrics"
 )
 
 var clientTracer = otel.Tracer("integrations/httpclient")
@@ -181,7 +182,7 @@ func (c *Client) doOnce(ctx context.Context, method, url string, body []byte) (*
 	if err != nil {
 		return nil, err
 	}
-	defer raw.Body.Close()
+	defer func() { _ = raw.Body.Close() }()
 
 	respBody, err := io.ReadAll(raw.Body)
 	if err != nil {

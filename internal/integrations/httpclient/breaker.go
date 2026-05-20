@@ -95,6 +95,9 @@ func (cb *CircuitBreaker) RecordSuccess() {
 	case stateClosed:
 		cb.failures = 0
 
+	case stateOpen:
+		// A success while open is ignored; the state transitions via Allow().
+
 	case stateHalfOpen:
 		cb.probes++
 		if cb.probes >= cb.cfg.HalfOpenProbes {
@@ -116,6 +119,9 @@ func (cb *CircuitBreaker) RecordFailure() {
 		if cb.failures >= cb.cfg.MaxFailures {
 			cb.transition(stateOpen)
 		}
+
+	case stateOpen:
+		// lastFailure is already updated above; nothing else to do.
 
 	case stateHalfOpen:
 		cb.probes = 0

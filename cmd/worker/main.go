@@ -56,7 +56,11 @@ func main() {
 		log.Error("failed to connect to clickhouse", "error", err)
 		os.Exit(1)
 	}
-	defer chDB.Close()
+	defer func() {
+		if err := chDB.Close(); err != nil {
+			log.Error("clickhouse close", "error", err)
+		}
+	}()
 
 	log.Info("connected to clickhouse")
 
@@ -78,21 +82,33 @@ func main() {
 	eventRepo := postgres.NewEventRepository(db)
 
 	producer := kafka.NewProducer(cfg.Kafka.Brokers)
-	defer producer.Close()
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.Error("producer close", "error", err)
+		}
+	}()
 
 	eventsConsumer := kafka.NewConsumer(
 		cfg.Kafka.Brokers,
 		cfg.Kafka.TopicEvents,
 		cfg.Kafka.ConsumerGroup,
 	)
-	defer eventsConsumer.Close()
+	defer func() {
+		if err := eventsConsumer.Close(); err != nil {
+			log.Error("events consumer close", "error", err)
+		}
+	}()
 
 	dlqConsumer := kafka.NewConsumer(
 		cfg.Kafka.Brokers,
 		cfg.Kafka.TopicDLQ,
 		cfg.Kafka.ConsumerGroup+"-dlq",
 	)
-	defer dlqConsumer.Close()
+	defer func() {
+		if err := dlqConsumer.Close(); err != nil {
+			log.Error("dlq consumer close", "error", err)
+		}
+	}()
 
 	processor := worker.NewProcessor(
 		eventsConsumer,

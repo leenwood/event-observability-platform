@@ -111,7 +111,7 @@ func TestBreaker_OnStateChangeCallback(t *testing.T) {
 	cb.RecordFailure() // closed → open
 
 	time.Sleep(70 * time.Millisecond)
-	_ = cb.Allow() // open → half-open
+	_ = cb.Allow()     // open → half-open
 	cb.RecordSuccess() // half-open → closed
 
 	want := []string{"closed→open", "open→half-open", "half-open→closed"}

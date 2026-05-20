@@ -85,7 +85,7 @@ func TestMemoryStore_ConcurrentSafety(t *testing.T) {
 
 	done := make(chan struct{})
 	for i := 0; i < 50; i++ {
-		go func(i int) {
+		go func(_ int) {
 			key := "shared-key"
 			_ = s.Set(ctx, key, &Entry{EventID: "ev", ExpiresAt: time.Now().Add(time.Hour)})
 			_, _ = s.Get(ctx, key)

@@ -57,7 +57,7 @@ func (q *Querier) DailyEvents(ctx context.Context, from, to time.Time) ([]DailyE
 		span.SetStatus(codes.Error, "query failed")
 		return nil, fmt.Errorf("daily events query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stats []DailyEventStat
 	for rows.Next() {

@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
-	"go.opentelemetry.io/otel/trace"
 )
 
 func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {

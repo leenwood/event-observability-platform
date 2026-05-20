@@ -36,6 +36,7 @@ func NewAnalyticsHandler(querier analyticsQuerier, log *slog.Logger) *AnalyticsH
 // @Failure  400   {object}  errorResponse
 // @Failure  500   {object}  errorResponse
 // @Router   /analytics/daily-events [get]
+// Returns an empty array if no data exists for the given range.
 func (h *AnalyticsHandler) DailyEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.FromContext(ctx, h.log)

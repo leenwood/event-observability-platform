@@ -22,7 +22,7 @@ func retryableStatus(code int) bool {
 }
 
 // backoff returns the delay before attempt n (0-indexed) using
-// exponential backoff with full jitter: delay = random(0, min(cap, base * 2^n))
+// exponential backoff with full jitter: delay = random(0, min(cap, base * 2^n)).
 func backoff(attempt int) time.Duration {
 	exp := math.Pow(2, float64(attempt))
 	ceiling := time.Duration(float64(baseDelay) * exp)

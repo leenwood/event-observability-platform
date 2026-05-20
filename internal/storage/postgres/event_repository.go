@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/leenwood/event-observability-platform/internal/app"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/leenwood/event-observability-platform/internal/app"
 )
 
 var tracer = otel.Tracer("storage/postgres")

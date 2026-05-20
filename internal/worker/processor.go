@@ -7,15 +7,16 @@ import (
 	"time"
 
 	kafkago "github.com/segmentio/kafka-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/leenwood/event-observability-platform/internal/analytics"
 	"github.com/leenwood/event-observability-platform/internal/app"
 	"github.com/leenwood/event-observability-platform/internal/integrations/kafka"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var processorTracer = otel.Tracer("worker/processor")
@@ -67,7 +68,7 @@ func (p *Processor) Run(ctx context.Context) error {
 		msg, err := p.consumer.FetchMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil
+				return ctx.Err()
 			}
 			p.log.Error("fetch message failed", slog.String("error", err.Error()))
 			time.Sleep(time.Second)
@@ -78,7 +79,7 @@ func (p *Processor) Run(ctx context.Context) error {
 
 		if err := p.consumer.CommitMessages(ctx, msg); err != nil {
 			if ctx.Err() != nil {
-				return nil
+				return ctx.Err()
 			}
 			p.log.Error("commit message failed", slog.String("error", err.Error()))
 		}
@@ -210,7 +211,7 @@ func (p *Processor) handleFailure(ctx context.Context, msg EventMessage, cause e
 	}
 }
 
-func (p *Processor) publishToDLQ(ctx context.Context, msg EventMessage, cause error) {
+func (p *Processor) publishToDLQ(ctx context.Context, msg EventMessage, _ error) {
 	log := logger.FromContext(ctx, p.log)
 
 	value, err := MarshalEventMessage(msg)
