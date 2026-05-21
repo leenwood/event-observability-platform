@@ -3,7 +3,11 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 )
 
 func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {
@@ -13,7 +17,21 @@ func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.
 	return h
 }
 
-func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
+func RequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.NewString()
+		}
+
+		ctx := logger.WithRequestID(r.Context(), requestID)
+		w.Header().Set("X-Request-ID", requestID)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func Logger(base *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
@@ -21,7 +39,8 @@ func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(rw, r)
 
-			logger.InfoContext(r.Context(), "request",
+			log := logger.FromContext(r.Context(), base)
+			log.InfoContext(r.Context(), "request",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", rw.status),
@@ -32,16 +51,18 @@ func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
+func Recover(base *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if rec := recover(); rec != nil {
-					logger.ErrorContext(r.Context(), "panic recovered",
+					log := logger.FromContext(r.Context(), base)
+					log.ErrorContext(r.Context(), "panic recovered",
 						slog.Any("panic", rec),
 						slog.String("path", r.URL.Path),
+						slog.String("stack", string(debug.Stack())),
 					)
-					http.Error(w, "internal server error", http.StatusInternalServerError)
+					http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 				}
 			}()
 			next.ServeHTTP(w, r)
