@@ -4,7 +4,10 @@ vars:
   BINARY_SERVER: bin/server
   BINARY_WORKER: bin/worker
   MODULE: github.com/leenwood/event-observability-platform
-  GOFLAGS: -trimpath
+  GOFLAGS: -trimpath -ldflags="-s -w"
+
+env:
+  CGO_ENABLED: "0"
 
 tasks:
 
