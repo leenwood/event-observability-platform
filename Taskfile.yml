@@ -17,8 +17,8 @@ tasks:
   # ── Build ──────────────────────────────────────────────────────────────────
 
   build:
-    desc: Build server and worker binaries
-    deps: [build:server, build:worker]
+    desc: Build all binaries (server, worker, migrate)
+    deps: [build:server, build:worker, build:migrate]
 
   build:server:
     desc: Build server binary → bin/server
@@ -29,6 +29,11 @@ tasks:
     desc: Build worker binary → bin/worker
     cmds:
       - go build {{.GOFLAGS}} -o {{.BINARY_WORKER}} ./cmd/worker
+
+  build:migrate:
+    desc: Build migrate binary → bin/migrate
+    cmds:
+      - go build {{.GOFLAGS}} -o bin/migrate ./cmd/migrate
 
   # ── Run ───────────────────────────────────────────────────────────────────
 
@@ -111,32 +116,22 @@ tasks:
   migrate:up:
     desc: Apply all pending PostgreSQL and ClickHouse migrations
     cmds:
-      - |
-        echo "Running PostgreSQL migrations..."
-        for f in migrations/postgres/*.up.sql; do
-          echo "  -> $f"
-          PGPASSWORD=events psql -h localhost -U events -d events -f "$f"
-        done
-      - |
-        echo "Running ClickHouse migrations..."
-        for f in migrations/clickhouse/*.up.sql; do
-          echo "  -> $f"
-          curl -s "http://localhost:8123/?user=events&password=events" --data-binary @"$f"
-        done
-      - echo "Migrations done."
+      - go run ./cmd/migrate -target=postgres up
+      - go run ./cmd/migrate -target=clickhouse up
 
   migrate:down:
-    desc: Revert all PostgreSQL migrations in reverse order
+    desc: Rollback the last PostgreSQL migration (use -target=clickhouse to target ClickHouse)
     cmds:
-      - |
-        echo "Reverting PostgreSQL migrations..."
-        for f in $(ls -r migrations/postgres/*.down.sql); do
-          echo "  -> $f"
-          PGPASSWORD=events psql -h localhost -U events -d events -f "$f"
-        done
+      - go run ./cmd/migrate -target=postgres down
+
+  migrate:status:
+    desc: Print migration status for both databases
+    cmds:
+      - echo "=== PostgreSQL ===" && go run ./cmd/migrate -target=postgres status
+      - echo "=== ClickHouse ===" && go run ./cmd/migrate -target=clickhouse status
 
   migrate:create:
-    desc: "Create a new migration file pair. Usage: task migrate:create -- <name>"
+    desc: "Create a new goose migration. Usage: task migrate:create -- <name>"
     cmds:
       - |
         name="{{.CLI_ARGS}}"
@@ -144,10 +139,8 @@ tasks:
           echo "Error: migration name required. Usage: task migrate:create -- <name>" >&2
           exit 1
         fi
-        count=$(ls migrations/postgres/*.up.sql 2>/dev/null | wc -l | tr -d ' ')
-        ts=$(printf '%03d' $((count + 1)))
-        touch "migrations/postgres/${ts}_${name}.up.sql" "migrations/postgres/${ts}_${name}.down.sql"
-        echo "Created migrations/postgres/${ts}_${name}.{up,down}.sql"
+        go run ./cmd/migrate -target=postgres create "$name" sql
+        echo "Tip: also create migrations/clickhouse/<version>_${name}.sql if needed"
 
   # ── Documentation ─────────────────────────────────────────────────────────
 

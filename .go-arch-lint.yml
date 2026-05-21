@@ -61,6 +61,8 @@ components:
     in: cmd/server
   WorkerCmd:
     in: cmd/worker
+  MigrateCmd:
+    in: cmd/migrate
 
   # Layer 2 — Application
   Middleware:
@@ -151,6 +153,9 @@ deps:
 
   # Entrypoints: allowed to depend on everything
   SwaggerDocs:
+    anyProjectDeps: true
+    anyVendorDeps: true
+  MigrateCmd:
     anyProjectDeps: true
     anyVendorDeps: true
   ServerCmd:
