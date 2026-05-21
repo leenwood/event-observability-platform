@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -13,10 +14,10 @@ import (
 )
 
 const (
-	targetPostgres    = "postgres"
-	targetClickHouse  = "clickhouse"
-	defaultPGDir      = "migrations/postgres"
-	defaultCHDir      = "migrations/clickhouse"
+	targetPostgres   = "postgres"
+	targetClickHouse = "clickhouse"
+	defaultPGDir     = "migrations/postgres"
+	defaultCHDir     = "migrations/clickhouse"
 )
 
 func main() {
@@ -56,7 +57,7 @@ func main() {
 	command := args[0]
 	commandArgs := args[1:]
 
-	if err := goose.Run(command, db, migrationsDir, commandArgs...); err != nil {
+	if err := goose.RunContext(context.Background(), command, db, migrationsDir, commandArgs...); err != nil {
 		log.Fatalf("migrate %s: %v", command, err)
 	}
 }
