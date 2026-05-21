@@ -81,6 +81,12 @@ tasks:
     cmds:
       - go tool go-arch-lint check
 
+  arch:graph:
+    desc: Generate architecture dependency graph → docs/arch-graph.svg
+    cmds:
+      - go tool go-arch-lint graph --out docs/arch-graph.svg
+      - echo "Graph saved to docs/arch-graph.svg"
+
   fmt:
     desc: Format all Go source files with gofmt and goimports
     cmds:
