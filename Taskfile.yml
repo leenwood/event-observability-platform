@@ -68,6 +68,11 @@ tasks:
     cmds:
       - go tool golangci-lint run ./...
 
+  arch:
+    desc: Check architectural dependency rules (.go-arch-lint.yml)
+    cmds:
+      - go tool go-arch-lint check
+
   fmt:
     desc: Format all Go source files with gofmt and goimports
     cmds:

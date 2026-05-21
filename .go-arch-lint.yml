@@ -1,0 +1,161 @@
+version: 3
+workdir: .
+
+allow:
+  depOnAnyVendor: true
+  # deepScan checks type flows across DI boundaries — false positives in composition roots (cmd/)
+  deepScan: false
+
+excludeFiles:
+  - "^.*_test\\.go$"
+
+# ── Components ────────────────────────────────────────────────────────────────
+#
+# Layer 0 — Foundation (no internal deps)
+#   app, config, metrics, observability/*
+#
+# Layer 1 — Infrastructure (depends only on Foundation)
+#   idempotency, storage/*, analytics, integrations/*
+#
+# Layer 2 — Application (depends on Foundation + Infrastructure)
+#   http/handler, http/middleware, worker
+#
+# Entrypoints (cmd/*) wire everything and are excluded from checks.
+
+components:
+
+  # Layer 0 — Foundation
+  Domain:
+    in: internal/app
+  Config:
+    in: internal/config
+  Metrics:
+    in: internal/metrics
+  Logger:
+    in: internal/observability/logger
+  Tracing:
+    in: internal/observability/tracing
+
+  # Layer 1 — Infrastructure
+  Idempotency:
+    in: internal/idempotency
+  PostgresStorage:
+    in: internal/storage/postgres
+  ClickHouseStorage:
+    in: internal/storage/clickhouse
+  Analytics:
+    in: internal/analytics
+  Kafka:
+    in: internal/integrations/kafka
+  HTTPClient:
+    in: internal/integrations/httpclient
+  Notifier:
+    in: internal/integrations/notifier
+
+  # Auto-generated swagger docs
+  SwaggerDocs:
+    in: docs/swagger
+
+  # Entrypoints — wire everything, no restrictions
+  ServerCmd:
+    in: cmd/server
+  WorkerCmd:
+    in: cmd/worker
+
+  # Layer 2 — Application
+  Middleware:
+    in: internal/http/middleware
+  Handler:
+    in: internal/http/handler
+  Worker:
+    in: internal/worker
+
+# ── Dependency rules ──────────────────────────────────────────────────────────
+deps:
+
+  # Foundation: no internal deps (vendor deps allowed via anyVendorDeps)
+  Domain:
+    anyVendorDeps: true
+  Config:
+    anyVendorDeps: true
+  Metrics:
+    anyVendorDeps: true
+  Logger:
+    anyVendorDeps: true
+  Tracing:
+    anyVendorDeps: true
+
+  # Layer 1
+  Idempotency:
+    mayDependOn:
+      - Domain
+
+  PostgresStorage:
+    mayDependOn:
+      - Domain
+      - Logger
+      - Tracing
+
+  ClickHouseStorage:
+    mayDependOn:
+      - Logger
+      - Tracing
+
+  Analytics:
+    mayDependOn:
+      - Domain
+      - Logger
+      - Tracing
+
+  Kafka:
+    mayDependOn:
+      - Logger
+      - Tracing
+
+  HTTPClient:
+    mayDependOn:
+      - Metrics
+      - Logger
+      - Tracing
+
+  Notifier:
+    mayDependOn:
+      - HTTPClient
+      - Logger
+
+  # Layer 2
+  Middleware:
+    mayDependOn:
+      - Logger
+      - Tracing
+      - Metrics
+
+  Handler:
+    mayDependOn:
+      - Domain
+      - Idempotency
+      - Analytics
+      - Metrics
+      - Logger
+      - Tracing
+      - Worker
+
+  Worker:
+    mayDependOn:
+      - Domain
+      - Analytics
+      - Kafka
+      - Metrics
+      - Logger
+      - Tracing
+
+  # Entrypoints: allowed to depend on everything
+  SwaggerDocs:
+    anyProjectDeps: true
+    anyVendorDeps: true
+  ServerCmd:
+    anyProjectDeps: true
+    anyVendorDeps: true
+  WorkerCmd:
+    anyProjectDeps: true
+    anyVendorDeps: true
