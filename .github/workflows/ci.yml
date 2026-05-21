@@ -20,7 +20,7 @@ jobs:
           cache: true
 
       - name: Download dependencies
-        run: go mod download
+        run: go mod download all
 
       - name: Vet
         run: go vet ./...
@@ -41,7 +41,7 @@ jobs:
           cache: true
 
       - name: Download dependencies
-        run: go mod download
+        run: go mod download all
 
       - name: golangci-lint
         run: go tool golangci-lint run ./...
