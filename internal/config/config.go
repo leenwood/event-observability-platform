@@ -11,6 +11,7 @@ type Config struct {
 	HTTP     HTTPConfig
 	Postgres PostgresConfig
 	Log      LogConfig
+	OTel     OTelConfig
 }
 
 type HTTPConfig struct {
@@ -34,6 +35,13 @@ type LogConfig struct {
 	Format string
 }
 
+type OTelConfig struct {
+	Enabled      bool
+	ServiceName  string
+	ExporterType string
+	Endpoint     string
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		HTTP: HTTPConfig{
@@ -53,6 +61,12 @@ func Load() (*Config, error) {
 		Log: LogConfig{
 			Level:  getEnv("LOG_LEVEL", "info"),
 			Format: getEnv("LOG_FORMAT", "json"),
+		},
+		OTel: OTelConfig{
+			Enabled:      getEnvBool("OTEL_ENABLED", false),
+			ServiceName:  getEnv("OTEL_SERVICE_NAME", "event-observability-platform"),
+			ExporterType: getEnv("OTEL_EXPORTER_TYPE", "stdout"),
+			Endpoint:     getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"),
 		},
 	}
 	return cfg, nil

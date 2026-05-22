@@ -4,10 +4,13 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {
@@ -31,22 +34,37 @@ func RequestID(next http.Handler) http.Handler {
 	})
 }
 
-func Logger(base *slog.Logger) func(http.Handler) http.Handler {
+func Logger(base *slog.Logger, m *metrics.Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 
+			// Inject trace_id from OTel span before the handler runs
+			// so all log calls within the handler carry it automatically.
+			ctx := r.Context()
+			if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+				ctx = logger.WithTraceID(ctx, span.SpanContext().TraceID().String())
+				r = r.WithContext(ctx)
+			}
+
 			next.ServeHTTP(rw, r)
 
-			log := logger.FromContext(r.Context(), base)
-			log.InfoContext(r.Context(), "request",
+			duration := time.Since(start)
+
+			logger.FromContext(ctx, base).InfoContext(ctx, "request",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", rw.status),
-				slog.Duration("latency", time.Since(start)),
+				slog.Duration("latency", duration),
 				slog.String("remote_addr", r.RemoteAddr),
 			)
+
+			if m != nil {
+				statusStr := strconv.Itoa(rw.status)
+				m.HTTPRequestsTotal.WithLabelValues(r.Method, r.URL.Path, statusStr).Inc()
+				m.HTTPRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration.Seconds())
+			}
 		})
 	}
 }
@@ -56,12 +74,12 @@ func Recover(base *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if rec := recover(); rec != nil {
-					log := logger.FromContext(r.Context(), base)
-					log.ErrorContext(r.Context(), "panic recovered",
+					logger.FromContext(r.Context(), base).ErrorContext(r.Context(), "panic recovered",
 						slog.Any("panic", rec),
 						slog.String("path", r.URL.Path),
 						slog.String("stack", string(debug.Stack())),
 					)
+					w.Header().Set("Content-Type", "application/json")
 					http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 				}
 			}()
