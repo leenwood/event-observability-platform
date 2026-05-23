@@ -65,4 +65,3 @@ func (s *IdempotencyStore) Set(ctx context.Context, key string, entry *idempoten
 	}
 	return nil
 }
-
