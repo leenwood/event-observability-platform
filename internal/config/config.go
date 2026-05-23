@@ -66,6 +66,11 @@ type OTelConfig struct {
 }
 
 func Load() (*Config, error) {
+	postgresDSN, err := requireEnv("POSTGRES_DSN")
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		HTTP: HTTPConfig{
 			Host:         getEnv("HTTP_HOST", "0.0.0.0"),
@@ -76,7 +81,7 @@ func Load() (*Config, error) {
 			PprofEnabled: getEnvBool("PPROF_ENABLED", false),
 		},
 		Postgres: PostgresConfig{
-			DSN:             requireEnv("POSTGRES_DSN"),
+			DSN:             postgresDSN,
 			MaxOpenConns:    getEnvInt("POSTGRES_MAX_OPEN_CONNS", 25),
 			MaxIdleConns:    getEnvInt("POSTGRES_MAX_IDLE_CONNS", 5),
 			ConnMaxLifetime: getEnvDuration("POSTGRES_CONN_MAX_LIFETIME", 5*time.Minute),
@@ -111,12 +116,12 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func requireEnv(key string) string {
+func requireEnv(key string) (string, error) {
 	v := os.Getenv(key)
 	if v == "" {
-		panic(fmt.Sprintf("required environment variable %q is not set", key))
+		return "", fmt.Errorf("required environment variable %q is not set", key)
 	}
-	return v
+	return v, nil
 }
 
 func getEnv(key, fallback string) string {

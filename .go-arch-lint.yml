@@ -12,13 +12,13 @@ excludeFiles:
 # ── Components ────────────────────────────────────────────────────────────────
 #
 # Layer 0 — Foundation (no internal deps)
-#   app, config, metrics, observability/*
+#   pkg/domain, config, pkg/platform/*
 #
 # Layer 1 — Infrastructure (depends only on Foundation)
-#   idempotency, storage/*, analytics, integrations/*
+#   pkg/idempotency, pkg/storage/*, pkg/analytics, pkg/messaging, pkg/outbound/*
 #
 # Layer 2 — Application (depends on Foundation + Infrastructure)
-#   http/handler, http/middleware, worker
+#   app/server/handler, app/server/middleware, app/processor
 #
 # Entrypoints (cmd/*) wire everything and are excluded from checks.
 
@@ -26,35 +26,41 @@ components:
 
   # Layer 0 — Foundation
   Domain:
-    in: internal/app
+    in: internal/pkg/domain
   Config:
     in: internal/config
   Metrics:
-    in: internal/metrics
+    in: internal/pkg/platform/metrics
   Logger:
-    in: internal/observability/logger
+    in: internal/pkg/platform/logger
   Tracing:
-    in: internal/observability/tracing
+    in: internal/pkg/platform/tracing
 
   # Layer 1 — Infrastructure
   Idempotency:
-    in: internal/idempotency
+    in: internal/pkg/idempotency
   PostgresStorage:
-    in: internal/storage/postgres
+    in: internal/pkg/storage/postgres
   ClickHouseStorage:
-    in: internal/storage/clickhouse
+    in: internal/pkg/storage/clickhouse
   Analytics:
-    in: internal/analytics
-  Kafka:
-    in: internal/integrations/kafka
+    in: internal/pkg/analytics
+  Messaging:
+    in: internal/pkg/messaging
   HTTPClient:
-    in: internal/integrations/httpclient
+    in: internal/pkg/outbound/httpclient
   Notifier:
-    in: internal/integrations/notifier
+    in: internal/pkg/outbound/notifier
 
   # Auto-generated swagger docs
   SwaggerDocs:
     in: docs/swagger
+
+  # Bootstrap — wires all dependencies; thin wrapper called from cmd/
+  Service:
+    in: internal/app/service
+  Migrate:
+    in: internal/app/migrate
 
   # Entrypoints — wire everything, no restrictions
   ServerCmd:
@@ -66,11 +72,11 @@ components:
 
   # Layer 2 — Application
   Middleware:
-    in: internal/http/middleware
+    in: internal/app/server/middleware
   Handler:
-    in: internal/http/handler
-  Worker:
-    in: internal/worker
+    in: internal/app/server/handler
+  Processor:
+    in: internal/app/processor
 
 # ── Dependency rules ──────────────────────────────────────────────────────────
 deps:
@@ -95,21 +101,22 @@ deps:
   PostgresStorage:
     mayDependOn:
       - Domain
+      - Idempotency
       - Logger
       - Tracing
 
   ClickHouseStorage:
     mayDependOn:
+      - Domain
+      - Analytics
       - Logger
       - Tracing
 
   Analytics:
     mayDependOn:
       - Domain
-      - Logger
-      - Tracing
 
-  Kafka:
+  Messaging:
     mayDependOn:
       - Logger
       - Tracing
@@ -140,18 +147,23 @@ deps:
       - Metrics
       - Logger
       - Tracing
-      - Worker
 
-  Worker:
+  Processor:
     mayDependOn:
       - Domain
       - Analytics
-      - Kafka
+      - Messaging
       - Metrics
       - Logger
       - Tracing
 
-  # Entrypoints: allowed to depend on everything
+  # Bootstrap + Entrypoints: allowed to depend on everything
+  Service:
+    anyProjectDeps: true
+    anyVendorDeps: true
+  Migrate:
+    anyProjectDeps: true
+    anyVendorDeps: true
   SwaggerDocs:
     anyProjectDeps: true
     anyVendorDeps: true
