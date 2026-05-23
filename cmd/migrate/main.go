@@ -1,5 +1,4 @@
-p
-	ackage main
+package main
 
 import "github.com/leenwood/event-observability-platform/internal/app/migrate"
 

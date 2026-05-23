@@ -11,16 +11,31 @@ excludeFiles:
 
 # ── Components ────────────────────────────────────────────────────────────────
 #
-# Layer 0 — Foundation (no internal deps)
-#   pkg/domain, config, pkg/platform/*
+# Структура internal/:
+#   internal/config/       — конфигурация приложения (общий слой)
+#   internal/pkg/          — переиспользуемые внутренние пакеты
+#   internal/app/          — прикладной код: хендлеры, воркеры, миграции
 #
-# Layer 1 — Infrastructure (depends only on Foundation)
-#   pkg/idempotency, pkg/storage/*, pkg/analytics, pkg/messaging, pkg/outbound/*
+# Layer 0 — Foundation (нет зависимостей на внутренние пакеты)
+#   internal/config
+#   internal/pkg/domain
+#   internal/pkg/platform/{logger,metrics,tracing}
 #
-# Layer 2 — Application (depends on Foundation + Infrastructure)
-#   app/server/handler, app/server/middleware, app/processor
+# Layer 1 — Infrastructure (зависит только от Foundation)
+#   internal/pkg/idempotency
+#   internal/pkg/storage/{postgres,clickhouse}
+#   internal/pkg/analytics
+#   internal/pkg/messaging
+#   internal/pkg/outbound/{httpclient,notifier}
 #
-# Entrypoints (cmd/*) wire everything and are excluded from checks.
+# Layer 2 — Application (зависит от Foundation + Infrastructure)
+#   internal/app/server/{handler,middleware}
+#   internal/app/processor
+#
+# Bootstrap (internal/app/service, internal/app/migrate) — собирают всё вместе,
+# вызываются из cmd/; зависимости не ограничены.
+#
+# Entrypoints (cmd/*) — точки входа, ограничения не применяются.
 
 components:
 
@@ -36,7 +51,7 @@ components:
   Tracing:
     in: internal/pkg/platform/tracing
 
-  # Layer 1 — Infrastructure
+  # Layer 1 — Infrastructure (internal/pkg/)
   Idempotency:
     in: internal/pkg/idempotency
   PostgresStorage:
@@ -52,25 +67,7 @@ components:
   Notifier:
     in: internal/pkg/outbound/notifier
 
-  # Auto-generated swagger docs
-  SwaggerDocs:
-    in: docs/swagger
-
-  # Bootstrap — wires all dependencies; thin wrapper called from cmd/
-  Service:
-    in: internal/app/service
-  Migrate:
-    in: internal/app/migrate
-
-  # Entrypoints — wire everything, no restrictions
-  ServerCmd:
-    in: cmd/server
-  WorkerCmd:
-    in: cmd/worker
-  MigrateCmd:
-    in: cmd/migrate
-
-  # Layer 2 — Application
+  # Layer 2 — Application (internal/app/)
   Middleware:
     in: internal/app/server/middleware
   Handler:
@@ -78,10 +75,28 @@ components:
   Processor:
     in: internal/app/processor
 
+  # Bootstrap — собирают зависимости и запускают приложение; вызываются из cmd/
+  Service:
+    in: internal/app/service
+  Migrate:
+    in: internal/app/migrate
+
+  # Entrypoints — только точки входа, без ограничений на зависимости
+  ServerCmd:
+    in: cmd/server
+  WorkerCmd:
+    in: cmd/worker
+  MigrateCmd:
+    in: cmd/migrate
+
+  # Auto-generated swagger docs
+  SwaggerDocs:
+    in: docs/swagger
+
 # ── Dependency rules ──────────────────────────────────────────────────────────
 deps:
 
-  # Foundation: no internal deps (vendor deps allowed via anyVendorDeps)
+  # Layer 0 — Foundation: внутренних зависимостей нет
   Domain:
     anyVendorDeps: true
   Config:
@@ -93,7 +108,7 @@ deps:
   Tracing:
     anyVendorDeps: true
 
-  # Layer 1
+  # Layer 1 — Infrastructure (internal/pkg/)
   Idempotency:
     mayDependOn:
       - Domain
@@ -132,7 +147,7 @@ deps:
       - HTTPClient
       - Logger
 
-  # Layer 2
+  # Layer 2 — Application (internal/app/)
   Middleware:
     mayDependOn:
       - Logger
@@ -157,7 +172,7 @@ deps:
       - Logger
       - Tracing
 
-  # Bootstrap + Entrypoints: allowed to depend on everything
+  # Bootstrap + Entrypoints: зависимости не ограничены
   Service:
     anyProjectDeps: true
     anyVendorDeps: true
