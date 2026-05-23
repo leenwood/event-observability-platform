@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/leenwood/event-observability-platform/internal/app/processor"
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/pkg/messaging"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/tracing"
-	"github.com/leenwood/event-observability-platform/internal/app/processor"
 	chstorage "github.com/leenwood/event-observability-platform/internal/pkg/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
 )
@@ -152,7 +152,7 @@ func RunWorker(ctx context.Context) error {
 		log.Warn("worker shutdown timed out")
 	}
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := shutdownTracing(shutdownCtx); err != nil {

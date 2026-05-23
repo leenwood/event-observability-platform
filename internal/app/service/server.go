@@ -13,13 +13,13 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	_ "github.com/leenwood/event-observability-platform/docs/swagger"
+	"github.com/leenwood/event-observability-platform/internal/app/server/handler"
+	"github.com/leenwood/event-observability-platform/internal/app/server/middleware"
 	"github.com/leenwood/event-observability-platform/internal/config"
 	kafkaclient "github.com/leenwood/event-observability-platform/internal/pkg/messaging"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/tracing"
-	"github.com/leenwood/event-observability-platform/internal/app/server/handler"
-	"github.com/leenwood/event-observability-platform/internal/app/server/middleware"
 	chstorage "github.com/leenwood/event-observability-platform/internal/pkg/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
 )
@@ -159,7 +159,7 @@ func RunServer(ctx context.Context) error {
 	}
 
 	log.Info("shutting down")
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
