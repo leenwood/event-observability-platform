@@ -8,9 +8,10 @@ import (
 	"time"
 
 	clickhousego "github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
 	tcontainers "github.com/testcontainers/testcontainers-go"
 	tcclickhouse "github.com/testcontainers/testcontainers-go/modules/clickhouse"
+
+	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
 )
 
 const analyticsSchemaSQL = `
@@ -51,7 +52,7 @@ func startClickHouseForStorage(t *testing.T) *DB {
 	t.Helper()
 	ctx := context.Background()
 
-	ctr, err := tcclickhouse.Run(ctx, "clickhouse/clickhouse-server:24-alpine",
+	ctr, err := tcclickhouse.Run(ctx, "clickhouse/clickhouse-http:24-alpine",
 		tcclickhouse.WithDatabase("events"),
 		tcclickhouse.WithUsername("events"),
 		tcclickhouse.WithPassword("events"),

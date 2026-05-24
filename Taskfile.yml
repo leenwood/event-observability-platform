@@ -1,10 +1,12 @@
 version: "3"
 
 vars:
-  BINARY_SERVER: bin/server
+  BINARY_SERVER: bin/http
   BINARY_WORKER: bin/worker
   MODULE: github.com/leenwood/event-observability-platform
   GOFLAGS: -trimpath -ldflags="-s -w"
+
+dotenv: ['.env']
 
 env:
   CGO_ENABLED: "0"
@@ -24,7 +26,7 @@ tasks:
     deps: [build:server, build:worker, build:migrate]
 
   build:server:
-    desc: Build server binary → bin/server
+    desc: Build server binary → bin/http
     cmds:
       - go build {{.GOFLAGS}} -o {{.BINARY_SERVER}} ./cmd/server
 
@@ -156,7 +158,7 @@ tasks:
   docs:
     desc: "Regenerate Swagger docs (requires: go install github.com/swaggo/swag/cmd/swag@latest)"
     cmds:
-      - swag init -g cmd/server/main.go -o docs/swagger --parseDependency --parseInternal
+      - swag init -g cmd/http/main.go -o docs/swagger --parseDependency --parseInternal
 
   # ── Dependencies ──────────────────────────────────────────────────────────
 

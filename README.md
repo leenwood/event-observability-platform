@@ -160,7 +160,7 @@ task docker:up
 # 4. Run migrations
 task migrate:up
 
-# 5. Run the server
+# 5. Run the http
 task run
 ```
 

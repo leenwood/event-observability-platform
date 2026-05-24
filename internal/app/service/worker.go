@@ -2,16 +2,11 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/leenwood/event-observability-platform/internal/app/processor"
-	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/pkg/messaging"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/tracing"
 	chstorage "github.com/leenwood/event-observability-platform/internal/pkg/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
 )
@@ -19,81 +14,24 @@ import (
 // RunWorker initialises all dependencies, starts Processor and DLQHandler
 // goroutines, and blocks until ctx is cancelled.
 func RunWorker(ctx context.Context) error {
-	cfg, err := config.Load()
+	infra, err := initInfra(ctx, "-worker")
 	if err != nil {
-		return fmt.Errorf("load config: %w", err)
+		return err
 	}
 
-	log := logger.New(cfg.Log.Level, cfg.Log.Format)
+	cfg := infra.Cfg
+	log := infra.Log
 
-	initCtx, initCancel := context.WithTimeout(ctx, 10*time.Second)
-	defer initCancel()
+	eventRepo := postgres.NewEventRepository(infra.DB)
 
-	shutdownTracing, err := tracing.Init(initCtx, tracing.Config{
-		Enabled:      cfg.OTel.Enabled,
-		ServiceName:  cfg.OTel.ServiceName + "-worker",
-		ExporterType: cfg.OTel.ExporterType,
-		Endpoint:     cfg.OTel.Endpoint,
-	})
-	if err != nil {
-		return fmt.Errorf("init tracing: %w", err)
-	}
-
-	m := metrics.New()
-
-	chDB, err := chstorage.New(initCtx, chstorage.Config{
-		Addr:     cfg.ClickHouse.Addr,
-		Database: cfg.ClickHouse.Database,
-		Username: cfg.ClickHouse.Username,
-		Password: cfg.ClickHouse.Password,
-	})
-	if err != nil {
-		return fmt.Errorf("connect clickhouse: %w", err)
-	}
-	defer func() {
-		if err := chDB.Close(); err != nil {
-			log.Error("clickhouse close", "error", err)
-		}
-	}()
-	log.Info("connected to clickhouse")
-
-	db, err := postgres.New(
-		initCtx,
-		cfg.Postgres.DSN,
-		cfg.Postgres.MaxOpenConns,
-		cfg.Postgres.MaxIdleConns,
-		cfg.Postgres.ConnMaxLifetime,
-	)
-	if err != nil {
-		return fmt.Errorf("connect postgres: %w", err)
-	}
-	defer db.Close()
-
-	eventRepo := postgres.NewEventRepository(db)
-
-	producer := messaging.NewProducer(cfg.Kafka.Brokers)
-	defer func() {
-		if err := producer.Close(); err != nil {
-			log.Error("producer close", "error", err)
-		}
-	}()
-
-	eventsConsumer := messaging.NewConsumer(
-		cfg.Kafka.Brokers,
-		cfg.Kafka.TopicEvents,
-		cfg.Kafka.ConsumerGroup,
-	)
+	eventsConsumer := messaging.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicEvents, cfg.Kafka.ConsumerGroup)
 	defer func() {
 		if err := eventsConsumer.Close(); err != nil {
 			log.Error("events consumer close", "error", err)
 		}
 	}()
 
-	dlqConsumer := messaging.NewConsumer(
-		cfg.Kafka.Brokers,
-		cfg.Kafka.TopicDLQ,
-		cfg.Kafka.ConsumerGroup+"-dlq",
-	)
+	dlqConsumer := messaging.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicDLQ, cfg.Kafka.ConsumerGroup+"-dlq")
 	defer func() {
 		if err := dlqConsumer.Close(); err != nil {
 			log.Error("dlq consumer close", "error", err)
@@ -102,15 +40,12 @@ func RunWorker(ctx context.Context) error {
 
 	proc := processor.NewProcessor(
 		eventsConsumer,
-		producer,
+		infra.Producer,
 		eventRepo,
-		chstorage.NewEventWriter(chDB),
-		m,
+		chstorage.NewEventWriter(infra.ChDB),
+		infra.Metrics,
 		log,
-		processor.Topics{
-			Events: cfg.Kafka.TopicEvents,
-			DLQ:    cfg.Kafka.TopicDLQ,
-		},
+		processor.Topics{Events: cfg.Kafka.TopicEvents, DLQ: cfg.Kafka.TopicDLQ},
 		cfg.Kafka.MaxRetries,
 	)
 
@@ -140,10 +75,7 @@ func RunWorker(ctx context.Context) error {
 	log.Info("worker shutting down")
 
 	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
+	go func() { wg.Wait(); close(done) }()
 
 	select {
 	case <-done:
@@ -152,12 +84,9 @@ func RunWorker(ctx context.Context) error {
 		log.Warn("worker shutdown timed out")
 	}
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer shutdownCancel()
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 
-	if err := shutdownTracing(shutdownCtx); err != nil {
-		log.Error("tracing shutdown error", "error", err)
-	}
-
+	infra.Shutdown(shutdownCtx)
 	return nil
 }

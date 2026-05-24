@@ -20,7 +20,7 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
 )
 
-var webhookTracer = otel.Tracer("server/handler/webhook")
+var webhookTracer = otel.Tracer("http/handler/webhook")
 
 type WebhookHandler struct {
 	events      domain.EventRepository
@@ -99,7 +99,7 @@ type webhookResponse struct {
 // @Failure  400      {object}  errorResponse    "Invalid JSON"
 // @Failure  415      {object}  errorResponse    "Unsupported Content-Type"
 // @Failure  422      {object}  errorResponse    "Missing required fields"
-// @Failure  500      {object}  errorResponse    "Internal server error"
+// @Failure  500      {object}  errorResponse    "Internal http error"
 // @Router   /webhooks/events [post]
 // Requires Content-Type: application/json.
 func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {

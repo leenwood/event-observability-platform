@@ -158,7 +158,7 @@ paths:
           schema:
             $ref: '#/definitions/internal_http_handler.errorResponse'
         "500":
-          description: Internal server error
+          description: Internal http error
           schema:
             $ref: '#/definitions/internal_http_handler.errorResponse'
       summary: Ingest webhook event

@@ -81,7 +81,7 @@ func Recover(base *slog.Logger) func(http.Handler) http.Handler {
 						slog.String("stack", string(debug.Stack())),
 					)
 					w.Header().Set("Content-Type", "application/json")
-					http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+					http.Error(w, `{"error":"internal http error"}`, http.StatusInternalServerError)
 				}
 			}()
 			next.ServeHTTP(w, r)

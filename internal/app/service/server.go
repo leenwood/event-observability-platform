@@ -5,17 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/http/pprof"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	httpSwagger "github.com/swaggo/http-swagger"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-
-	_ "github.com/leenwood/event-observability-platform/docs/swagger"
-	"github.com/leenwood/event-observability-platform/internal/app/server/handler"
-	"github.com/leenwood/event-observability-platform/internal/app/server/middleware"
-	"github.com/leenwood/event-observability-platform/internal/config"
+	"github.com/leenwood/event-observability-platform/internal"
+	apphttp "github.com/leenwood/event-observability-platform/internal/app/http"
 	kafkaclient "github.com/leenwood/event-observability-platform/internal/pkg/messaging"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
 	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
@@ -24,12 +17,10 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
 )
 
-const maxBodyBytes = 1 << 20 // 1 MiB
-
 // RunServer initialises all dependencies, starts the HTTP server, and blocks
 // until ctx is cancelled or a fatal error occurs.
 func RunServer(ctx context.Context) error {
-	cfg, err := config.Load()
+	cfg, err := internal.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
@@ -94,59 +85,32 @@ func RunServer(ctx context.Context) error {
 	}()
 	log.Info("connected to clickhouse")
 
-	mux := http.NewServeMux()
-
-	healthHandler := handler.NewHealthHandler(db)
-	mux.HandleFunc("GET /health", healthHandler.Health)
-	mux.HandleFunc("GET /ready", healthHandler.Ready)
-
-	webhookHandler := handler.NewWebhookHandler(
-		eventRepo, idemStore, producer, cfg.Kafka.TopicEvents,
-		m, log, cfg.App.IdempotencyTTL,
-	)
-	mux.HandleFunc("POST /webhooks/events", webhookHandler.HandleEvent)
-
-	analyticsHandler := handler.NewAnalyticsHandler(chstorage.NewEventQuerier(chDB), log)
-	mux.HandleFunc("GET /analytics/daily-events", analyticsHandler.DailyEvents)
-
-	mux.Handle("GET /metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
-		EnableOpenMetrics: true,
-	}))
-	mux.Handle("/swagger/", httpSwagger.WrapHandler)
-
 	if cfg.HTTP.PprofEnabled {
-		mux.HandleFunc("GET /debug/pprof/", pprof.Index)
-		mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
 		log.Info("pprof enabled", "path", "/debug/pprof/")
 	}
 
-	chain := otelhttp.NewHandler(
-		middleware.Chain(
-			mux,
-			middleware.Recover(log),
-			middleware.Logger(log, m),
-			middleware.RequestID,
-			middleware.MaxBodySize(maxBodyBytes),
-		),
-		"http.server",
-		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
-	)
-
-	addr := fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port)
-	srv := &http.Server{
-		Addr:         addr,
-		Handler:      chain,
+	srv := apphttp.NewServer(apphttp.Config{
+		Host:         cfg.HTTP.Host,
+		Port:         cfg.HTTP.Port,
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,
-	}
+		PprofEnabled: cfg.HTTP.PprofEnabled,
+	}, apphttp.Deps{
+		DB:             db,
+		EventRepo:      eventRepo,
+		IdemStore:      idemStore,
+		Publisher:      producer,
+		EventQuerier:   chstorage.NewEventQuerier(chDB),
+		Metrics:        m,
+		Log:            log,
+		EventsTopic:    cfg.Kafka.TopicEvents,
+		IdempotencyTTL: cfg.App.IdempotencyTTL,
+	})
 
 	srvErr := make(chan error, 1)
 	go func() {
-		log.Info("server starting", "addr", addr)
+		log.Info("http starting", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			srvErr <- err
 		}
@@ -154,7 +118,7 @@ func RunServer(ctx context.Context) error {
 
 	select {
 	case err := <-srvErr:
-		return fmt.Errorf("server error: %w", err)
+		return fmt.Errorf("http error: %w", err)
 	case <-ctx.Done():
 	}
 
@@ -170,6 +134,6 @@ func RunServer(ctx context.Context) error {
 		log.Error("tracing shutdown error", "error", err)
 	}
 
-	log.Info("server stopped")
+	log.Info("http stopped")
 	return nil
 }

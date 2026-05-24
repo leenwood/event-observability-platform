@@ -177,7 +177,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "Internal http error",
                         "schema": {
                             "$ref": "#/definitions/internal_http_handler.errorResponse"
                         }

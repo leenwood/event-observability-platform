@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Examples of interacting with the Event Observability Platform API.
-# Prerequisites: server running on localhost:8080
+# Prerequisites: http running on localhost:8080
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 

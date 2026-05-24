@@ -29,7 +29,7 @@ excludeFiles:
 #   internal/pkg/outbound/{httpclient,notifier}
 #
 # Layer 2 — Application (зависит от Foundation + Infrastructure)
-#   internal/app/server/{handler,middleware}
+#   internal/app/http/{handler,middleware}
 #   internal/app/processor
 #
 # Bootstrap (internal/app/service, internal/app/migrate) — собирают всё вместе,
@@ -69,9 +69,9 @@ components:
 
   # Layer 2 — Application (internal/app/)
   Middleware:
-    in: internal/app/server/middleware
+    in: internal/app/http/middleware
   Handler:
-    in: internal/app/server/handler
+    in: internal/app/http/handler
   Processor:
     in: internal/app/processor
 
@@ -83,7 +83,7 @@ components:
 
   # Entrypoints — только точки входа, без ограничений на зависимости
   ServerCmd:
-    in: cmd/server
+    in: cmd/http
   WorkerCmd:
     in: cmd/worker
   MigrateCmd:

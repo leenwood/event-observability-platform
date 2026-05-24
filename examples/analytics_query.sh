@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Analytics API examples for the Event Observability Platform.
-# Prerequisites: server running on localhost:8080, ClickHouse populated with events.
+# Prerequisites: http running on localhost:8080, ClickHouse populated with events.
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 
