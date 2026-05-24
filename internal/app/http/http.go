@@ -95,7 +95,10 @@ func NewServer(cfg Config, deps Deps) *nethttp.Server {
 			middleware.MaxBodySize(maxBodyBytes),
 		),
 		"http.server",
-		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
+		otelhttp.WithFilter(func(r *nethttp.Request) bool {
+			p := r.URL.Path
+			return p != "/metrics" && p != "/health"
+		}),
 	)
 
 	return &nethttp.Server{
