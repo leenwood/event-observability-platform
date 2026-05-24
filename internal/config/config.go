@@ -12,6 +12,11 @@ type Config struct {
 	Postgres PostgresConfig
 	Log      LogConfig
 	OTel     OTelConfig
+	App      AppConfig
+}
+
+type AppConfig struct {
+	IdempotencyTTL time.Duration
 }
 
 type HTTPConfig struct {
@@ -67,6 +72,9 @@ func Load() (*Config, error) {
 			ServiceName:  getEnv("OTEL_SERVICE_NAME", "event-observability-platform"),
 			ExporterType: getEnv("OTEL_EXPORTER_TYPE", "stdout"),
 			Endpoint:     getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"),
+		},
+		App: AppConfig{
+			IdempotencyTTL: getEnvDuration("IDEMPOTENCY_TTL", 24*time.Hour),
 		},
 	}
 	return cfg, nil

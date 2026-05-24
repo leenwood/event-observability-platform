@@ -14,6 +14,7 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/http/middleware"
+	"github.com/leenwood/event-observability-platform/internal/idempotency"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"github.com/leenwood/event-observability-platform/internal/observability/tracing"
@@ -21,6 +22,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
+
+const maxBodyBytes = 1 << 20 // 1 MiB
 
 func main() {
 	cfg, err := config.Load()
@@ -66,11 +69,17 @@ func main() {
 
 	log.Info("connected to postgres")
 
+	eventRepo := postgres.NewEventRepository(db)
+	idemStore := idempotency.NewPostgresStore(db.Pool)
+
 	mux := http.NewServeMux()
 
 	healthHandler := handler.NewHealthHandler(db)
 	mux.HandleFunc("GET /health", healthHandler.Health)
 	mux.HandleFunc("GET /ready", healthHandler.Ready)
+
+	webhookHandler := handler.NewWebhookHandler(eventRepo, idemStore, m, log, cfg.App.IdempotencyTTL)
+	mux.HandleFunc("POST /webhooks/events", webhookHandler.HandleEvent)
 
 	mux.Handle("GET /metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
 		EnableOpenMetrics: true,
@@ -91,6 +100,7 @@ func main() {
 			middleware.Recover(log),
 			middleware.Logger(log, m),
 			middleware.RequestID,
+			middleware.MaxBodySize(maxBodyBytes),
 		),
 		"http.server",
 		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
