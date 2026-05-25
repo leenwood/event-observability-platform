@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
-	"github.com/leenwood/event-observability-platform/internal/pkg/idempotency"
 	tcontainers "github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/leenwood/event-observability-platform/internal/core/domain"
+	"github.com/leenwood/event-observability-platform/internal/core/dto"
 )
 
 const (
@@ -202,7 +203,7 @@ func TestIdempotencyStore_SetAndGet(t *testing.T) {
 
 	store := NewIdempotencyStore(db)
 
-	entry := &idempotency.Entry{
+	entry := &dto.Entry{
 		EventID:   ev.ID,
 		Response:  []byte(`{"event_id":"` + ev.ID + `"}`),
 		ExpiresAt: time.Now().Add(24 * time.Hour),

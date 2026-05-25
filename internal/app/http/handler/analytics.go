@@ -1,27 +1,23 @@
 package handler
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/analytics"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/core/dto"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/core/port"
 )
 
 const dateLayout = "2006-01-02"
 
-type analyticsQuerier interface {
-	DailyEvents(ctx context.Context, from, to time.Time) ([]analytics.DailyEventStat, error)
-}
-
 type AnalyticsHandler struct {
-	querier analyticsQuerier
+	querier port.AnalyticsQuerier
 	log     *slog.Logger
 }
 
-func NewAnalyticsHandler(querier analyticsQuerier, log *slog.Logger) *AnalyticsHandler {
+func NewAnalyticsHandler(querier port.AnalyticsQuerier, log *slog.Logger) *AnalyticsHandler {
 	return &AnalyticsHandler{querier: querier, log: log}
 }
 
@@ -32,7 +28,7 @@ func NewAnalyticsHandler(querier analyticsQuerier, log *slog.Logger) *AnalyticsH
 // @Produce  json
 // @Param    from  query     string                   true  "Start date (YYYY-MM-DD)"
 // @Param    to    query     string                   true  "End date (YYYY-MM-DD, max 366 days range)"
-// @Success  200   {array}   analytics.DailyEventStat
+// @Success  200   {array}   dto.DailyEventStat
 // @Failure  400   {object}  errorResponse
 // @Failure  500   {object}  errorResponse
 // @Router   /analytics/daily-events [get]
@@ -84,7 +80,7 @@ func (h *AnalyticsHandler) DailyEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if stats == nil {
-		stats = []analytics.DailyEventStat{}
+		stats = []dto.DailyEventStat{}
 	}
 
 	writeJSON(w, http.StatusOK, stats)

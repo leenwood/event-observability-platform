@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/leenwood/event-observability-platform/internal/app/processor"
-	"github.com/leenwood/event-observability-platform/internal/pkg/messaging"
-	chstorage "github.com/leenwood/event-observability-platform/internal/pkg/storage/clickhouse"
-	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
+	"github.com/leenwood/event-observability-platform/internal/infra/messaging"
+	chstorage "github.com/leenwood/event-observability-platform/internal/infra/storage/clickhouse"
+	"github.com/leenwood/event-observability-platform/internal/infra/storage/postgres"
 )
 
 // RunWorker initialises all dependencies, starts Processor and DLQHandler
@@ -38,15 +39,16 @@ func RunWorker(ctx context.Context) error {
 		}
 	}()
 
+	analyticsWriter := chstorage.NewEventWriter(infra.ChDB)
+	processEvent := usecase.NewProcessEvent(eventRepo, analyticsWriter, cfg.Kafka.MaxRetries, log)
+
 	proc := processor.NewProcessor(
 		eventsConsumer,
 		infra.Producer,
-		eventRepo,
-		chstorage.NewEventWriter(infra.ChDB),
+		processEvent,
 		infra.Metrics,
 		log,
 		processor.Topics{Events: cfg.Kafka.TopicEvents, DLQ: cfg.Kafka.TopicDLQ},
-		cfg.Kafka.MaxRetries,
 	)
 
 	dlqHandler := processor.NewDLQHandler(dlqConsumer, eventRepo, log)

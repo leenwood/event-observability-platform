@@ -1,9 +1,11 @@
-package idempotency
+package memory
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/leenwood/event-observability-platform/internal/core/dto"
 )
 
 func TestMemoryStore_GetMissing(t *testing.T) {
@@ -21,7 +23,7 @@ func TestMemoryStore_SetAndGet(t *testing.T) {
 	s := NewMemoryStore()
 	ctx := context.Background()
 
-	want := &Entry{
+	want := &dto.Entry{
 		EventID:   "event-123",
 		Response:  []byte(`{"event_id":"event-123"}`),
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -47,8 +49,8 @@ func TestMemoryStore_SetDoesNotOverwrite(t *testing.T) {
 	s := NewMemoryStore()
 	ctx := context.Background()
 
-	first := &Entry{EventID: "first", ExpiresAt: time.Now().Add(time.Hour)}
-	second := &Entry{EventID: "second", ExpiresAt: time.Now().Add(time.Hour)}
+	first := &dto.Entry{EventID: "first", ExpiresAt: time.Now().Add(time.Hour)}
+	second := &dto.Entry{EventID: "second", ExpiresAt: time.Now().Add(time.Hour)}
 
 	_ = s.Set(ctx, "key", first)
 	_ = s.Set(ctx, "key", second)
@@ -63,7 +65,7 @@ func TestMemoryStore_ExpiredEntryNotReturned(t *testing.T) {
 	s := NewMemoryStore()
 	ctx := context.Background()
 
-	entry := &Entry{
+	entry := &dto.Entry{
 		EventID:   "old-event",
 		ExpiresAt: time.Now().Add(-time.Second),
 	}
@@ -87,7 +89,7 @@ func TestMemoryStore_ConcurrentSafety(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		go func(_ int) {
 			key := "shared-key"
-			_ = s.Set(ctx, key, &Entry{EventID: "ev", ExpiresAt: time.Now().Add(time.Hour)})
+			_ = s.Set(ctx, key, &dto.Entry{EventID: "ev", ExpiresAt: time.Now().Add(time.Hour)})
 			_, _ = s.Get(ctx, key)
 			done <- struct{}{}
 		}(i)

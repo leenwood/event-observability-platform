@@ -11,7 +11,7 @@ import (
 	tcontainers "github.com/testcontainers/testcontainers-go"
 	tcclickhouse "github.com/testcontainers/testcontainers-go/modules/clickhouse"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
+	"github.com/leenwood/event-observability-platform/internal/core/domain"
 )
 
 const analyticsSchemaSQL = `

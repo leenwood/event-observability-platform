@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
+	"github.com/leenwood/event-observability-platform/internal/core/domain"
 )
 
 var writerTracer = otel.Tracer("storage/clickhouse/writer")

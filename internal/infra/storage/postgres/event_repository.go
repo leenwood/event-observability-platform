@@ -10,7 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
+	"github.com/leenwood/event-observability-platform/internal/core/domain"
 )
 
 var tracer = otel.Tracer("storage/postgres")

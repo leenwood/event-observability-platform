@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/outbound/httpclient"
+	"github.com/leenwood/event-observability-platform/internal/infra/outbound/httpclient"
 )
 
 // Notifier sends event notifications to an external webhook endpoint.

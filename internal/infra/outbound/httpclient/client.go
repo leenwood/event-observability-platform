@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
 )
 
 var clientTracer = otel.Tracer("outbound/httpclient")

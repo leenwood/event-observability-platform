@@ -10,11 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
-	pgstore "github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
 	tcontainers "github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
+	pgstore "github.com/leenwood/event-observability-platform/internal/infra/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
 )
 
 const handlerSchemaSQL = `
@@ -79,7 +81,8 @@ func TestWebhookHandler_Integration_HappyPath(t *testing.T) {
 
 	repo := pgstore.NewEventRepository(db)
 	store := pgstore.NewIdempotencyStore(db)
-	h := NewWebhookHandler(repo, store, noopPublisher{}, "events", metrics.New(), log, 24*time.Hour)
+	uc := usecase.NewIngestEvent(repo, noopPublisher{}, "events", log)
+	h := NewWebhookHandler(uc, store, metrics.New(), log, 24*time.Hour)
 
 	rr := postJSON(t, h, validPayload())
 	if rr.Code != http.StatusAccepted {
@@ -96,7 +99,8 @@ func TestWebhookHandler_Integration_DuplicateReturnsReplay(t *testing.T) {
 
 	repo := pgstore.NewEventRepository(db)
 	store := pgstore.NewIdempotencyStore(db)
-	h := NewWebhookHandler(repo, store, noopPublisher{}, "events", metrics.New(), log, 24*time.Hour)
+	uc := usecase.NewIngestEvent(repo, noopPublisher{}, "events", log)
+	h := NewWebhookHandler(uc, store, metrics.New(), log, 24*time.Hour)
 
 	payload := map[string]any{
 		"idempotency_key": "integration-idem-key",

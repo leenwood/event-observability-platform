@@ -8,44 +8,39 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
-	"github.com/leenwood/event-observability-platform/internal/pkg/idempotency"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/core/dto"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/core/port"
+	"github.com/leenwood/event-observability-platform/internal/core/service"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
 )
 
 var webhookTracer = otel.Tracer("http/handler/webhook")
 
 type WebhookHandler struct {
-	events      domain.EventRepository
-	idem        idempotency.Store
-	publisher   domain.Publisher
-	eventsTopic string
+	ingestEvent *usecase.IngestEvent
+	idem        port.IdempotencyStore
 	metrics     *metrics.Metrics
 	log         *slog.Logger
 	idemTTL     time.Duration
 }
 
 func NewWebhookHandler(
-	events domain.EventRepository,
-	idem idempotency.Store,
-	publisher domain.Publisher,
-	eventsTopic string,
+	ingestEvent *usecase.IngestEvent,
+	idem port.IdempotencyStore,
 	m *metrics.Metrics,
 	log *slog.Logger,
 	idemTTL time.Duration,
 ) *WebhookHandler {
 	return &WebhookHandler{
-		events:      events,
+		ingestEvent: ingestEvent,
 		idem:        idem,
-		publisher:   publisher,
-		eventsTopic: eventsTopic,
 		metrics:     m,
 		log:         log,
 		idemTTL:     idemTTL,
@@ -135,6 +130,7 @@ func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {
 		attribute.String("event.idempotency_key", req.IdempotencyKey),
 	)
 
+	// Idempotency check — transport-level concern.
 	existing, err := h.idem.Get(ctx, req.IdempotencyKey)
 	if err != nil {
 		span.RecordError(err)
@@ -158,33 +154,30 @@ func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event := &domain.Event{
-		ID:             uuid.NewString(),
+	// Business logic — delegate to the use case.
+	out, err := h.ingestEvent.Execute(ctx, usecase.IngestEventInput{
 		IdempotencyKey: req.IdempotencyKey,
 		Source:         req.Source,
 		EventType:      req.EventType,
 		Payload:        []byte(req.Payload),
-		Status:         domain.EventStatusPending,
-		CreatedAt:      time.Now().UTC(),
-	}
-
-	if err := h.events.Insert(ctx, event); err != nil {
+	})
+	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "db insert failed")
-		log.ErrorContext(ctx, "failed to insert event", slog.String("error", err.Error()))
+		span.SetStatus(codes.Error, "ingest failed")
+		log.ErrorContext(ctx, "failed to ingest event", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to process request")
 		return
 	}
 
 	traceID := trace.SpanFromContext(ctx).SpanContext().TraceID().String()
-	resp := webhookResponse{EventID: event.ID, TraceID: traceID}
-
+	resp := webhookResponse{EventID: out.EventID, TraceID: traceID}
 	respBytes, _ := json.Marshal(resp)
 
-	if err := h.idem.Set(ctx, req.IdempotencyKey, &idempotency.Entry{
-		EventID:   event.ID,
+	// Cache response for future duplicate detection — transport-level concern.
+	if err := h.idem.Set(ctx, req.IdempotencyKey, &dto.Entry{
+		EventID:   out.EventID,
 		Response:  respBytes,
-		ExpiresAt: idempotency.TTL(h.idemTTL),
+		ExpiresAt: service.TTL(h.idemTTL),
 	}); err != nil {
 		log.WarnContext(ctx, "failed to store idempotency key",
 			slog.String("error", err.Error()),
@@ -192,32 +185,16 @@ func (h *WebhookHandler) HandleEvent(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
-	h.metrics.EventsProcessedTotal.WithLabelValues(event.Source, "accepted").Inc()
+	h.metrics.EventsProcessedTotal.WithLabelValues(req.Source, "accepted").Inc()
 
-	span.SetAttributes(attribute.String("event.id", event.ID))
+	span.SetAttributes(attribute.String("event.id", out.EventID))
 	span.SetStatus(codes.Ok, "")
 
 	log.InfoContext(ctx, "event accepted",
-		slog.String("event_id", event.ID),
-		slog.String("source", event.Source),
-		slog.String("event_type", event.EventType),
+		slog.String("event_id", out.EventID),
+		slog.String("source", req.Source),
+		slog.String("event_type", req.EventType),
 	)
-
-	// Publish to queue asynchronously. A failure here does not roll back the
-	// DB insert — the event remains 'pending' and can be reconciled later.
-	// See README: "Possible production improvements → transactional outbox".
-	if h.publisher != nil {
-		msg := domain.EventMessage{EventID: event.ID, Attempt: 1}
-		value, err := domain.MarshalEventMessage(msg)
-		if err == nil {
-			if err := h.publisher.Publish(ctx, h.eventsTopic, event.ID, value); err != nil {
-				log.WarnContext(ctx, "failed to publish event to queue",
-					slog.String("error", err.Error()),
-					slog.String("event_id", event.ID),
-				)
-			}
-		}
-	}
 
 	writeJSON(w, http.StatusAccepted, resp)
 }

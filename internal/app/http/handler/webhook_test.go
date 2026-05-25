@@ -11,17 +11,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
-	"github.com/leenwood/event-observability-platform/internal/pkg/idempotency"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/core/domain"
+	"github.com/leenwood/event-observability-platform/internal/infra/storage/memory"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
 )
 
-// noopPublisher satisfies domain.Publisher without sending anything.
+// noopPublisher satisfies port.Publisher without sending anything.
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(_ context.Context, _, _ string, _ []byte) error { return nil }
 
-// mockEventRepo satisfies domain.EventRepository using zero-value defaults.
+// mockEventRepo satisfies port.EventRepository using zero-value defaults.
 type mockEventRepo struct {
 	insertErr error
 }
@@ -40,9 +41,10 @@ func (m *mockEventRepo) ListByStatus(_ context.Context, _ domain.EventStatus, _ 
 	return nil, nil
 }
 
-func newTestHandler(repo domain.EventRepository, store idempotency.Store) *WebhookHandler {
+func newTestHandler(repo *mockEventRepo, store *memory.MemoryStore) *WebhookHandler {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewWebhookHandler(repo, store, noopPublisher{}, "events", metrics.New(), log, 24*time.Hour)
+	uc := usecase.NewIngestEvent(repo, noopPublisher{}, "events", log)
+	return NewWebhookHandler(uc, store, metrics.New(), log, 24*time.Hour)
 }
 
 func postJSON(t *testing.T, h *WebhookHandler, body any) *httptest.ResponseRecorder {
@@ -65,7 +67,7 @@ func validPayload() map[string]any {
 }
 
 func TestWebhookHandler_HappyPath(t *testing.T) {
-	h := newTestHandler(&mockEventRepo{}, idempotency.NewMemoryStore())
+	h := newTestHandler(&mockEventRepo{}, memory.NewMemoryStore())
 	rr := postJSON(t, h, validPayload())
 
 	if rr.Code != http.StatusAccepted {
@@ -82,7 +84,7 @@ func TestWebhookHandler_HappyPath(t *testing.T) {
 }
 
 func TestWebhookHandler_DuplicateRequest(t *testing.T) {
-	store := idempotency.NewMemoryStore()
+	store := memory.NewMemoryStore()
 	h := newTestHandler(&mockEventRepo{}, store)
 
 	rr1 := postJSON(t, h, validPayload())
@@ -109,7 +111,7 @@ func TestWebhookHandler_DuplicateRequest(t *testing.T) {
 }
 
 func TestWebhookHandler_MissingFields(t *testing.T) {
-	h := newTestHandler(&mockEventRepo{}, idempotency.NewMemoryStore())
+	h := newTestHandler(&mockEventRepo{}, memory.NewMemoryStore())
 
 	cases := []struct {
 		name string
@@ -132,7 +134,7 @@ func TestWebhookHandler_MissingFields(t *testing.T) {
 }
 
 func TestWebhookHandler_InvalidJSON(t *testing.T) {
-	h := newTestHandler(&mockEventRepo{}, idempotency.NewMemoryStore())
+	h := newTestHandler(&mockEventRepo{}, memory.NewMemoryStore())
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhooks/events", bytes.NewBufferString("{bad json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -145,7 +147,7 @@ func TestWebhookHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestWebhookHandler_WrongContentType(t *testing.T) {
-	h := newTestHandler(&mockEventRepo{}, idempotency.NewMemoryStore())
+	h := newTestHandler(&mockEventRepo{}, memory.NewMemoryStore())
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhooks/events", bytes.NewBufferString("{}"))
 	req.Header.Set("Content-Type", "text/plain")

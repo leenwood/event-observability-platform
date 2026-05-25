@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/analytics"
+	"github.com/leenwood/event-observability-platform/internal/core/dto"
 )
 
 var queryTracer = otel.Tracer("storage/clickhouse/querier")
@@ -26,7 +26,7 @@ func NewEventQuerier(db *DB) *EventQuerier {
 // DailyEvents returns aggregated event counts per day, source and event_type
 // for the requested date range. Reads from the daily_event_stats materialized view.
 // SummingMergeTree may have unmerged parts — the sum() handles that correctly.
-func (q *EventQuerier) DailyEvents(ctx context.Context, from, to time.Time) ([]analytics.DailyEventStat, error) {
+func (q *EventQuerier) DailyEvents(ctx context.Context, from, to time.Time) ([]dto.DailyEventStat, error) {
 	ctx, span := queryTracer.Start(ctx, "clickhouse.DailyEvents")
 	defer span.End()
 
@@ -54,9 +54,9 @@ func (q *EventQuerier) DailyEvents(ctx context.Context, from, to time.Time) ([]a
 	}
 	defer func() { _ = rows.Close() }()
 
-	var stats []analytics.DailyEventStat
+	var stats []dto.DailyEventStat
 	for rows.Next() {
-		var s analytics.DailyEventStat
+		var s dto.DailyEventStat
 		if err := rows.Scan(&s.Date, &s.Source, &s.EventType, &s.EventCount); err != nil {
 			return nil, fmt.Errorf("scan daily event stat: %w", err)
 		}

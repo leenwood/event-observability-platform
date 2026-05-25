@@ -9,12 +9,13 @@ import (
 
 	"github.com/leenwood/event-observability-platform/internal"
 	apphttp "github.com/leenwood/event-observability-platform/internal/app/http"
-	kafkaclient "github.com/leenwood/event-observability-platform/internal/pkg/messaging"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/tracing"
-	chstorage "github.com/leenwood/event-observability-platform/internal/pkg/storage/clickhouse"
-	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
+	kafkaclient "github.com/leenwood/event-observability-platform/internal/infra/messaging"
+	chstorage "github.com/leenwood/event-observability-platform/internal/infra/storage/clickhouse"
+	"github.com/leenwood/event-observability-platform/internal/infra/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/platform/tracing"
 )
 
 // RunServer initialises all dependencies, starts the HTTP server, and blocks
@@ -89,6 +90,8 @@ func RunServer(ctx context.Context) error {
 		log.Info("pprof enabled", "path", "/debug/pprof/")
 	}
 
+	ingestEvent := usecase.NewIngestEvent(eventRepo, producer, cfg.Kafka.TopicEvents, log)
+
 	srv := apphttp.NewServer(apphttp.Config{
 		Host:         cfg.HTTP.Host,
 		Port:         cfg.HTTP.Port,
@@ -98,13 +101,11 @@ func RunServer(ctx context.Context) error {
 		PprofEnabled: cfg.HTTP.PprofEnabled,
 	}, apphttp.Deps{
 		DB:             db,
-		EventRepo:      eventRepo,
+		IngestEvent:    ingestEvent,
 		IdemStore:      idemStore,
-		Publisher:      producer,
 		EventQuerier:   chstorage.NewEventQuerier(chDB),
 		Metrics:        m,
 		Log:            log,
-		EventsTopic:    cfg.Kafka.TopicEvents,
 		IdempotencyTTL: cfg.App.IdempotencyTTL,
 	})
 

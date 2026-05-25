@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/leenwood/event-observability-platform/internal"
-	"github.com/leenwood/event-observability-platform/internal/pkg/messaging"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/tracing"
-	chstorage "github.com/leenwood/event-observability-platform/internal/pkg/storage/clickhouse"
-	"github.com/leenwood/event-observability-platform/internal/pkg/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/infra/messaging"
+	chstorage "github.com/leenwood/event-observability-platform/internal/infra/storage/clickhouse"
+	"github.com/leenwood/event-observability-platform/internal/infra/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/platform/tracing"
 )
 
 // Infra holds all shared infrastructure dependencies initialised at startup.

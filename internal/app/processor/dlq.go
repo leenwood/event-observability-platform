@@ -9,9 +9,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
-	"github.com/leenwood/event-observability-platform/internal/pkg/messaging"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/core/domain"
+	"github.com/leenwood/event-observability-platform/internal/core/mapper"
+	"github.com/leenwood/event-observability-platform/internal/infra/messaging"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/core/port"
 )
 
 var dlqTracer = otel.Tracer("processor/dlq")
@@ -20,13 +22,13 @@ var dlqTracer = otel.Tracer("processor/dlq")
 // logs structured details, and marks events as failed in PostgreSQL.
 type DLQHandler struct {
 	consumer *messaging.Consumer
-	events   domain.EventRepository
+	events   port.EventRepository
 	log      *slog.Logger
 }
 
 func NewDLQHandler(
 	consumer *messaging.Consumer,
-	events domain.EventRepository,
+	events port.EventRepository,
 	log *slog.Logger,
 ) *DLQHandler {
 	return &DLQHandler{consumer: consumer, events: events, log: log}
@@ -51,7 +53,7 @@ func (h *DLQHandler) Run(ctx context.Context) error {
 			trace.WithSpanKind(trace.SpanKindConsumer),
 		)
 
-		evtMsg, err := domain.UnmarshalEventMessage(msg.Value)
+		evtMsg, err := mapper.UnmarshalEventMessage(msg.Value)
 		if err != nil {
 			h.log.ErrorContext(msgCtx, "dlq: unparseable message",
 				slog.String("error", err.Error()),

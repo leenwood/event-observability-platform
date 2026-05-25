@@ -13,22 +13,32 @@ excludeFiles:
 #
 # Структура internal/:
 #   internal/config/       — конфигурация приложения (общий слой)
-#   internal/pkg/          — переиспользуемые внутренние пакеты
+#   internal/core/         — бизнес-ядро: domain, port, dto, service, mapper, usecase
+#   internal/infra/        — инфраструктура: storage, messaging, outbound
+#   internal/platform/     — cross-cutting: logger, metrics, tracing
 #   internal/app/          — прикладной код: хендлеры, воркеры, миграции
 #
 # Layer 0 — Foundation (нет зависимостей на внутренние пакеты)
 #   internal/config
-#   internal/pkg/domain
-#   internal/pkg/platform/{logger,metrics,tracing}
+#   internal/core/domain
+#   internal/core/dto
+#   internal/platform/{logger,metrics,tracing}
 #
-# Layer 1 — Infrastructure (зависит только от Foundation)
-#   internal/pkg/idempotency
-#   internal/pkg/storage/{postgres,clickhouse}
-#   internal/pkg/analytics
-#   internal/pkg/messaging
-#   internal/pkg/outbound/{httpclient,notifier}
+# Layer 1a — Contracts (зависит от Foundation)
+#   internal/core/port      (интерфейсы: зависит от domain, dto)
+#   internal/core/service   (переиспользуемая бизнес-логика: зависит от dto)
+#   internal/core/mapper    (преобразования DTO: зависит от dto)
 #
-# Layer 2 — Application (зависит от Foundation + Infrastructure)
+# Layer 1b — Infrastructure (зависит от Foundation + Contracts)
+#   internal/infra/storage/memory    (MemoryStore: зависит от dto)
+#   internal/infra/storage/{postgres,clickhouse}
+#   internal/infra/messaging
+#   internal/infra/outbound/{httpclient,notifier}
+#
+# Layer 2a — Use Cases (зависит от Foundation + Contracts)
+#   internal/core/usecase
+#
+# Layer 2b — Application (зависит от Foundation + Contracts + Use Cases + Infrastructure)
 #   internal/app/http/{handler,middleware}
 #   internal/app/processor
 #
@@ -41,33 +51,47 @@ components:
 
   # Layer 0 — Foundation
   Domain:
-    in: internal/pkg/domain
+    in: internal/core/domain
+  Dto:
+    in: internal/core/dto
   Config:
-    in: internal/config
+    in: internal
   Metrics:
-    in: internal/pkg/platform/metrics
+    in: internal/platform/metrics
   Logger:
-    in: internal/pkg/platform/logger
+    in: internal/platform/logger
   Tracing:
-    in: internal/pkg/platform/tracing
+    in: internal/platform/tracing
 
-  # Layer 1 — Infrastructure (internal/pkg/)
+  # Layer 1a — Contracts
+  Port:
+    in: internal/core/port
+  Service:
+    in: internal/core/service
+  Mapper:
+    in: internal/core/mapper
+
+  # Layer 1b — Infrastructure (internal/infra/)
   Idempotency:
-    in: internal/pkg/idempotency
+    in: internal/infra/storage/memory
   PostgresStorage:
-    in: internal/pkg/storage/postgres
+    in: internal/infra/storage/postgres
   ClickHouseStorage:
-    in: internal/pkg/storage/clickhouse
-  Analytics:
-    in: internal/pkg/analytics
+    in: internal/infra/storage/clickhouse
   Messaging:
-    in: internal/pkg/messaging
+    in: internal/infra/messaging
   HTTPClient:
-    in: internal/pkg/outbound/httpclient
+    in: internal/infra/outbound/httpclient
   Notifier:
-    in: internal/pkg/outbound/notifier
+    in: internal/infra/outbound/notifier
 
-  # Layer 2 — Application (internal/app/)
+  # Layer 2a — Use Cases
+  UseCase:
+    in: internal/core/usecase
+
+  # Layer 2b — Application (internal/app/)
+  AppHTTP:
+    in: internal/app/http
   Middleware:
     in: internal/app/http/middleware
   Handler:
@@ -76,14 +100,14 @@ components:
     in: internal/app/processor
 
   # Bootstrap — собирают зависимости и запускают приложение; вызываются из cmd/
-  Service:
+  AppService:
     in: internal/app/service
   Migrate:
     in: internal/app/migrate
 
   # Entrypoints — только точки входа, без ограничений на зависимости
   ServerCmd:
-    in: cmd/http
+    in: cmd/server
   WorkerCmd:
     in: cmd/worker
   MigrateCmd:
@@ -96,8 +120,10 @@ components:
 # ── Dependency rules ──────────────────────────────────────────────────────────
 deps:
 
-  # Layer 0 — Foundation: внутренних зависимостей нет
+  # Layer 0 — Foundation: без внутренних зависимостей
   Domain:
+    anyVendorDeps: true
+  Dto:
     anyVendorDeps: true
   Config:
     anyVendorDeps: true
@@ -108,28 +134,38 @@ deps:
   Tracing:
     anyVendorDeps: true
 
-  # Layer 1 — Infrastructure (internal/pkg/)
-  Idempotency:
+  # Layer 1a — Contracts
+  Port:
     mayDependOn:
       - Domain
+      - Dto
+
+  Service:
+    mayDependOn:
+      - Dto
+
+  Mapper:
+    mayDependOn:
+      - Dto
+
+  # Layer 1b — Infrastructure
+  Idempotency:
+    mayDependOn:
+      - Dto
 
   PostgresStorage:
     mayDependOn:
       - Domain
-      - Idempotency
+      - Dto
       - Logger
       - Tracing
 
   ClickHouseStorage:
     mayDependOn:
       - Domain
-      - Analytics
+      - Dto
       - Logger
       - Tracing
-
-  Analytics:
-    mayDependOn:
-      - Domain
 
   Messaging:
     mayDependOn:
@@ -147,7 +183,28 @@ deps:
       - HTTPClient
       - Logger
 
-  # Layer 2 — Application (internal/app/)
+  # Layer 2a — Use Cases
+  UseCase:
+    mayDependOn:
+      - Domain
+      - Dto
+      - Port
+      - Mapper
+      - Logger
+
+  # Layer 2b — Application
+  AppHTTP:
+    mayDependOn:
+      - Domain
+      - Dto
+      - Port
+      - UseCase
+      - Handler
+      - Middleware
+      - Metrics
+      - Logger
+      - SwaggerDocs
+
   Middleware:
     mayDependOn:
       - Logger
@@ -157,8 +214,10 @@ deps:
   Handler:
     mayDependOn:
       - Domain
-      - Idempotency
-      - Analytics
+      - Dto
+      - Port
+      - Service
+      - UseCase
       - Metrics
       - Logger
       - Tracing
@@ -166,14 +225,17 @@ deps:
   Processor:
     mayDependOn:
       - Domain
-      - Analytics
+      - Dto
+      - Port
+      - Mapper
+      - UseCase
       - Messaging
       - Metrics
       - Logger
       - Tracing
 
   # Bootstrap + Entrypoints: зависимости не ограничены
-  Service:
+  AppService:
     anyProjectDeps: true
     anyVendorDeps: true
   Migrate:

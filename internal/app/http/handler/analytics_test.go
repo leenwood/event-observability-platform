@@ -12,20 +12,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leenwood/event-observability-platform/internal/pkg/analytics"
+	"github.com/leenwood/event-observability-platform/internal/core/dto"
+	"github.com/leenwood/event-observability-platform/internal/core/port"
 )
 
-// stubQuerier implements analyticsQuerier for unit tests.
+// stubQuerier implements port.AnalyticsQuerier for unit tests.
 type stubQuerier struct {
-	stats []analytics.DailyEventStat
+	stats []dto.DailyEventStat
 	err   error
 }
 
-func (s *stubQuerier) DailyEvents(_ context.Context, _, _ time.Time) ([]analytics.DailyEventStat, error) {
+func (s *stubQuerier) DailyEvents(_ context.Context, _, _ time.Time) ([]dto.DailyEventStat, error) {
 	return s.stats, s.err
 }
 
-func newAnalyticsHandler(q analyticsQuerier) *AnalyticsHandler {
+func newAnalyticsHandler(q port.AnalyticsQuerier) *AnalyticsHandler {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	return NewAnalyticsHandler(q, log)
 }
@@ -107,7 +108,7 @@ func TestAnalyticsHandler_EmptyResultIsArray(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
-	var result []analytics.DailyEventStat
+	var result []dto.DailyEventStat
 	if err := json.NewDecoder(rr.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -121,7 +122,7 @@ func TestAnalyticsHandler_EmptyResultIsArray(t *testing.T) {
 
 func TestAnalyticsHandler_ReturnsStats(t *testing.T) {
 	date, _ := time.Parse("2006-01-02", "2024-01-15")
-	stub := &stubQuerier{stats: []analytics.DailyEventStat{
+	stub := &stubQuerier{stats: []dto.DailyEventStat{
 		{Date: date, Source: "shopify", EventType: "order.shipped", EventCount: 42},
 	}}
 
@@ -131,7 +132,7 @@ func TestAnalyticsHandler_ReturnsStats(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var result []analytics.DailyEventStat
+	var result []dto.DailyEventStat
 	if err := json.NewDecoder(rr.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}

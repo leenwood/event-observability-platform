@@ -15,10 +15,9 @@ import (
 	_ "github.com/leenwood/event-observability-platform/docs/swagger"
 	"github.com/leenwood/event-observability-platform/internal/app/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/app/http/middleware"
-	"github.com/leenwood/event-observability-platform/internal/pkg/analytics"
-	"github.com/leenwood/event-observability-platform/internal/pkg/domain"
-	"github.com/leenwood/event-observability-platform/internal/pkg/idempotency"
-	"github.com/leenwood/event-observability-platform/internal/pkg/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
+	"github.com/leenwood/event-observability-platform/internal/core/port"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
 )
 
 const maxBodyBytes int64 = 1 << 20 // 1 MiB
@@ -38,21 +37,14 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// DailyEventsQuerier is satisfied by the ClickHouse analytics querier.
-type DailyEventsQuerier interface {
-	DailyEvents(ctx context.Context, from, to time.Time) ([]analytics.DailyEventStat, error)
-}
-
 // Deps groups all application-layer dependencies needed to wire the HTTP server.
 type Deps struct {
 	DB             Pinger
-	EventRepo      domain.EventRepository
-	IdemStore      idempotency.Store
-	Publisher      domain.Publisher
-	EventQuerier   DailyEventsQuerier
+	IngestEvent    *usecase.IngestEvent
+	IdemStore      port.IdempotencyStore
+	EventQuerier   port.AnalyticsQuerier
 	Metrics        *metrics.Metrics
 	Log            *slog.Logger
-	EventsTopic    string
 	IdempotencyTTL time.Duration
 }
 
@@ -65,7 +57,7 @@ func NewServer(cfg Config, deps Deps) *nethttp.Server {
 	mux.HandleFunc("GET /ready", healthHandler.Ready)
 
 	webhookHandler := handler.NewWebhookHandler(
-		deps.EventRepo, deps.IdemStore, deps.Publisher, deps.EventsTopic,
+		deps.IngestEvent, deps.IdemStore,
 		deps.Metrics, deps.Log, deps.IdempotencyTTL,
 	)
 	mux.HandleFunc("POST /webhooks/events", webhookHandler.HandleEvent)
