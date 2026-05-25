@@ -16,6 +16,11 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 )
 
+// noopPublisher satisfies app.Publisher without sending anything.
+type noopPublisher struct{}
+
+func (noopPublisher) Publish(_ context.Context, _, _ string, _ []byte) error { return nil }
+
 // mockEventRepo satisfies app.EventRepository using zero-value defaults.
 type mockEventRepo struct {
 	insertErr error
@@ -37,7 +42,7 @@ func (m *mockEventRepo) ListByStatus(_ context.Context, _ app.EventStatus, _ int
 
 func newTestHandler(repo app.EventRepository, store idempotency.Store) *WebhookHandler {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewWebhookHandler(repo, store, metrics.New(), log, 24*time.Hour)
+	return NewWebhookHandler(repo, store, noopPublisher{}, "events", metrics.New(), log, 24*time.Hour)
 }
 
 func postJSON(t *testing.T, h *WebhookHandler, body any) *httptest.ResponseRecorder {

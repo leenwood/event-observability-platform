@@ -15,6 +15,7 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/http/middleware"
 	"github.com/leenwood/event-observability-platform/internal/idempotency"
+	kafkaclient "github.com/leenwood/event-observability-platform/internal/integrations/kafka"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"github.com/leenwood/event-observability-platform/internal/observability/tracing"
@@ -72,13 +73,19 @@ func main() {
 	eventRepo := postgres.NewEventRepository(db)
 	idemStore := idempotency.NewPostgresStore(db.Pool)
 
+	producer := kafkaclient.NewProducer(cfg.Kafka.Brokers)
+	defer producer.Close()
+
 	mux := http.NewServeMux()
 
 	healthHandler := handler.NewHealthHandler(db)
 	mux.HandleFunc("GET /health", healthHandler.Health)
 	mux.HandleFunc("GET /ready", healthHandler.Ready)
 
-	webhookHandler := handler.NewWebhookHandler(eventRepo, idemStore, m, log, cfg.App.IdempotencyTTL)
+	webhookHandler := handler.NewWebhookHandler(
+		eventRepo, idemStore, producer, cfg.Kafka.TopicEvents,
+		m, log, cfg.App.IdempotencyTTL,
+	)
 	mux.HandleFunc("POST /webhooks/events", webhookHandler.HandleEvent)
 
 	mux.Handle("GET /metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
