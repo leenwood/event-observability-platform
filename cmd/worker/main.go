@@ -9,11 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leenwood/event-observability-platform/internal/analytics"
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/integrations/kafka"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"github.com/leenwood/event-observability-platform/internal/observability/tracing"
+	chstorage "github.com/leenwood/event-observability-platform/internal/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/storage/postgres"
 	"github.com/leenwood/event-observability-platform/internal/worker"
 )
@@ -42,7 +44,23 @@ func main() {
 	}
 
 	m := metrics.New()
-	_ = m // worker metrics are written directly; HTTP exposure added if needed
+	_ = m
+
+	chDB, err := chstorage.New(initCtx, chstorage.Config{
+		Addr:     cfg.ClickHouse.Addr,
+		Database: cfg.ClickHouse.Database,
+		Username: cfg.ClickHouse.Username,
+		Password: cfg.ClickHouse.Password,
+	})
+	if err != nil {
+		log.Error("failed to connect to clickhouse", "error", err)
+		os.Exit(1)
+	}
+	defer chDB.Close()
+
+	log.Info("connected to clickhouse")
+
+	analyticsWriter := analytics.NewEventWriter(chDB.Conn())
 
 	db, err := postgres.New(
 		initCtx,
@@ -80,6 +98,7 @@ func main() {
 		eventsConsumer,
 		producer,
 		eventRepo,
+		analyticsWriter,
 		m,
 		log,
 		worker.Topics{

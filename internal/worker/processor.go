@@ -7,6 +7,7 @@ import (
 	"time"
 
 	kafkago "github.com/segmentio/kafka-go"
+	"github.com/leenwood/event-observability-platform/internal/analytics"
 	"github.com/leenwood/event-observability-platform/internal/app"
 	"github.com/leenwood/event-observability-platform/internal/integrations/kafka"
 	"github.com/leenwood/event-observability-platform/internal/metrics"
@@ -28,6 +29,7 @@ type Processor struct {
 	consumer   *kafka.Consumer
 	producer   *kafka.Producer
 	events     app.EventRepository
+	analytics  analytics.Writer
 	metrics    *metrics.Metrics
 	log        *slog.Logger
 	topics     Topics
@@ -38,6 +40,7 @@ func NewProcessor(
 	consumer *kafka.Consumer,
 	producer *kafka.Producer,
 	events app.EventRepository,
+	analyticsWriter analytics.Writer,
 	m *metrics.Metrics,
 	log *slog.Logger,
 	topics Topics,
@@ -47,6 +50,7 @@ func NewProcessor(
 		consumer:   consumer,
 		producer:   producer,
 		events:     events,
+		analytics:  analyticsWriter,
 		metrics:    m,
 		log:        log,
 		topics:     topics,
@@ -149,8 +153,7 @@ func (p *Processor) processMessage(ctx context.Context, raw kafkago.Message) {
 	log.Info("event processed successfully")
 }
 
-// process contains the actual business logic for an event.
-// ClickHouse write is added in iteration 7 — placeholder here.
+// process contains the business logic for a single event.
 func (p *Processor) process(ctx context.Context, event *app.Event) error {
 	_, span := processorTracer.Start(ctx, "worker.process")
 	defer span.End()
@@ -160,7 +163,17 @@ func (p *Processor) process(ctx context.Context, event *app.Event) error {
 		attribute.String("event.type", event.EventType),
 	)
 
-	// TODO(iter7): write to ClickHouse analytics store here.
+	if p.analytics != nil {
+		if err := p.analytics.WriteEvent(ctx, event); err != nil {
+			// Analytics write failure is non-fatal: PostgreSQL is the source
+			// of truth; ClickHouse can be backfilled from it if needed.
+			logger.FromContext(ctx, p.log).WarnContext(ctx, "analytics write failed",
+				slog.String("error", err.Error()),
+				slog.String("event_id", event.ID),
+			)
+		}
+	}
+
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leenwood/event-observability-platform/internal/analytics"
 	"github.com/leenwood/event-observability-platform/internal/config"
 	"github.com/leenwood/event-observability-platform/internal/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/http/middleware"
@@ -19,6 +20,7 @@ import (
 	"github.com/leenwood/event-observability-platform/internal/metrics"
 	"github.com/leenwood/event-observability-platform/internal/observability/logger"
 	"github.com/leenwood/event-observability-platform/internal/observability/tracing"
+	chstorage "github.com/leenwood/event-observability-platform/internal/storage/clickhouse"
 	"github.com/leenwood/event-observability-platform/internal/storage/postgres"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -76,6 +78,22 @@ func main() {
 	producer := kafkaclient.NewProducer(cfg.Kafka.Brokers)
 	defer producer.Close()
 
+	chDB, err := chstorage.New(initCtx, chstorage.Config{
+		Addr:     cfg.ClickHouse.Addr,
+		Database: cfg.ClickHouse.Database,
+		Username: cfg.ClickHouse.Username,
+		Password: cfg.ClickHouse.Password,
+	})
+	if err != nil {
+		log.Error("failed to connect to clickhouse", "error", err)
+		os.Exit(1)
+	}
+	defer chDB.Close()
+
+	log.Info("connected to clickhouse")
+
+	analyticsQuerier := analytics.NewQuerier(chDB.Conn())
+
 	mux := http.NewServeMux()
 
 	healthHandler := handler.NewHealthHandler(db)
@@ -87,6 +105,9 @@ func main() {
 		m, log, cfg.App.IdempotencyTTL,
 	)
 	mux.HandleFunc("POST /webhooks/events", webhookHandler.HandleEvent)
+
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsQuerier, log)
+	mux.HandleFunc("GET /analytics/daily-events", analyticsHandler.DailyEvents)
 
 	mux.Handle("GET /metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{
 		EnableOpenMetrics: true,
