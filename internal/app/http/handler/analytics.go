@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/leenwood/event-observability-platform/internal/core/dto"
-	"github.com/leenwood/event-observability-platform/internal/platform/logger"
 	"github.com/leenwood/event-observability-platform/internal/core/port"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
 )
 
 const dateLayout = "2006-01-02"

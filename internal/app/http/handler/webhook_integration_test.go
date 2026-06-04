@@ -14,9 +14,9 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
-	pgstore "github.com/leenwood/event-observability-platform/internal/infra/storage/postgres"
 	"github.com/leenwood/event-observability-platform/internal/core/usecase"
+	pgstore "github.com/leenwood/event-observability-platform/internal/infra/storage/postgres"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
 )
 
 const handlerSchemaSQL = `

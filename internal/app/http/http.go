@@ -15,9 +15,9 @@ import (
 	_ "github.com/leenwood/event-observability-platform/docs/swagger"
 	"github.com/leenwood/event-observability-platform/internal/app/http/handler"
 	"github.com/leenwood/event-observability-platform/internal/app/http/middleware"
-	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
 	"github.com/leenwood/event-observability-platform/internal/core/port"
 	"github.com/leenwood/event-observability-platform/internal/core/usecase"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
 )
 
 const maxBodyBytes int64 = 1 << 20 // 1 MiB

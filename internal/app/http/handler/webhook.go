@@ -14,11 +14,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/leenwood/event-observability-platform/internal/core/dto"
-	"github.com/leenwood/event-observability-platform/internal/platform/logger"
-	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
 	"github.com/leenwood/event-observability-platform/internal/core/port"
 	"github.com/leenwood/event-observability-platform/internal/core/service"
 	"github.com/leenwood/event-observability-platform/internal/core/usecase"
+	"github.com/leenwood/event-observability-platform/internal/platform/logger"
+	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
 )
 
 var webhookTracer = otel.Tracer("http/handler/webhook")

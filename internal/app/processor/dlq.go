@@ -11,9 +11,9 @@ import (
 
 	"github.com/leenwood/event-observability-platform/internal/core/domain"
 	"github.com/leenwood/event-observability-platform/internal/core/mapper"
+	"github.com/leenwood/event-observability-platform/internal/core/port"
 	"github.com/leenwood/event-observability-platform/internal/infra/messaging"
 	"github.com/leenwood/event-observability-platform/internal/platform/logger"
-	"github.com/leenwood/event-observability-platform/internal/core/port"
 )
 
 var dlqTracer = otel.Tracer("processor/dlq")

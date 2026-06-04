@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/leenwood/event-observability-platform/internal/core/domain"
+	"github.com/leenwood/event-observability-platform/internal/core/usecase"
 	"github.com/leenwood/event-observability-platform/internal/infra/storage/memory"
 	"github.com/leenwood/event-observability-platform/internal/platform/metrics"
-	"github.com/leenwood/event-observability-platform/internal/core/usecase"
 )
 
 // noopPublisher satisfies port.Publisher without sending anything.
